@@ -96,6 +96,7 @@ public class RequestTest {
                 String expected = getExpectedData();
                 String returned = instance.getData();
                 Assert.assertEquals("Expected data matches data returned from request message: " + message, expected, returned);
+                Assert.assertFalse("Returned data is not empty from request message: " + message, returned.isEmpty());
             } else {
                 fail("Missing exception for non valid of message: " + message);
             }
@@ -112,9 +113,9 @@ public class RequestTest {
     private String getExpectedData(){
         switch(requestType){
             case INFO:
-                return message.split("^INFO\\s")[0].trim();
+                return message.split("^INFO\\s")[1].trim();
             case PHOTO:
-                return message.split("^FOTO\\s")[0].trim();
+                return message.split("^FOTO\\s")[1].trim();
             case USERNAME:
             case PASSWORD:
                 return message.trim();
