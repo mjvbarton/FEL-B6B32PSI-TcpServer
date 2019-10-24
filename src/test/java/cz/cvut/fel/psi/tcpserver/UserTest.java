@@ -5,6 +5,7 @@
  */
 package cz.cvut.fel.psi.tcpserver;
 
+import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -91,6 +92,15 @@ public class UserTest {
     @Test
     public void testHashCode_hashCodeSameAsFromUserNameString_retrievedHashCodeequalsToUsernameHashCode() {       
         assertEquals("User's hashCode equals to username's hashCode:", username.hashCode(), instance.hashCode());        
+    }
+    
+    @Test
+    public void testUserFromRequest_validMessagePassedToConstructor_userPasswordMatchesPasswordGiven() throws RequestSyntaxException{
+        String message = username;
+        Request request = new Request(username);
+        User requestUser = new User(request);
+        assertEquals("Usernames of user for username: " + username + " matching.", username, requestUser.toString());
+        assertEquals("Passwords of user for username: " + username + " matching.", expectedPassword, requestUser.getPassword());
     }
     
 }

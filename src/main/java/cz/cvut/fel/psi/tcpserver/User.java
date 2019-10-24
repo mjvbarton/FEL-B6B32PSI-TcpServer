@@ -13,6 +13,14 @@ public class User implements Serializable{
         this.username = username;
     }
     
+    public User(Request request){
+        if(request.getType() == RequestType.USERNAME){
+            this.username = request.getData();
+        } else {
+            throw new RuntimeException();
+        }
+    }
+    
     public String getPassword(){
         byte[] bytes = username.getBytes();
         int sum = 0;
@@ -35,7 +43,5 @@ public class User implements Serializable{
     @Override
     public int hashCode() {
         return username.hashCode();
-    }
-    
-    
+    }        
 }
