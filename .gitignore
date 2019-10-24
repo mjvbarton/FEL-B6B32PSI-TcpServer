@@ -1,0 +1,20 @@
+# Enterprise architect model
+*.EAP
+*.zargo
+*.zargo~
+*.ldb
+
+# Exported diagrams
+# *.png
+
+# Intellij
+.idea/
+*.iml
+*.iws
+
+# Maven
+log/
+target/
+
+# NetBeans
+nbproject/
