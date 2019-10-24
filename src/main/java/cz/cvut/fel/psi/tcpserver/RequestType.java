@@ -10,13 +10,13 @@ import java.util.regex.Pattern;
  */
 public enum RequestType {
         
-    USERNAME("(^Robot)\\s(\\w+)"),
+    USERNAME("(^Robot)(\\s*\\w+)"),
     PASSWORD("(^\\d+$)"),
     INFO("(^INFO)\\s([^\\r\\n])*"),
     PHOTO("null");
     
     private final Pattern syntax;
-    
+        
     private RequestType(String syntax){
         this.syntax = Pattern.compile(syntax);
         

@@ -16,7 +16,8 @@ public class MessageData {
     public static Collection getData(){
         return Arrays.asList(new Object[][]{
             {RequestType.USERNAME, "Robot Emil cislo 33", true},
-            {RequestType.USERNAME, "RobotEmil cislo 33", false},
+            {RequestType.USERNAME, "RobotEmil cislo 33", true},
+            {RequestType.USERNAME, "Robot345", true},
             {RequestType.USERNAME, "Ja jsem Robot Emil cislo 33", false},
             {RequestType.PASSWORD, "1645", true},
             {RequestType.PASSWORD, "1645a", false},
