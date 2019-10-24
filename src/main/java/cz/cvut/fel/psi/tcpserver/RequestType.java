@@ -13,7 +13,7 @@ public enum RequestType {
     USERNAME("(^Robot)(\\s*\\w+)"),
     PASSWORD("(^\\d+$)"),
     INFO("(^INFO)\\s([^\\r\\n])*"),
-    PHOTO("null");
+    PHOTO("^FOTO\\s\\d+\\s.+$");
     
     private final Pattern syntax;
         

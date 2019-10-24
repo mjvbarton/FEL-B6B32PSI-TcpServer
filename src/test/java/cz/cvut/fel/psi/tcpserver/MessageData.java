@@ -24,7 +24,12 @@ public class MessageData {
             {RequestType.INFO, "INFO 2014-02-19 03:35 blíží se jiný robot", true},
             {RequestType.INFO, "Moje INFO 2014-02-19 03:35 blíží se jiný robot", false},
             {RequestType.INFO, "2014-02-19 03:35 blíží se jiný robot", false},
-            {RequestType.INFO, "INFO2014-02-19 03:35 blíží se jiný robot", false},});
+            {RequestType.INFO, "INFO2014-02-19 03:35 blíží se jiný robot", false},
+            {RequestType.PHOTO, "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x24", true},
+            {RequestType.PHOTO, "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x12", true},
+            {RequestType.PHOTO, "FOTO823 ABCDEFGH\\x00\\x00\\x02\\x24", false},
+            {RequestType.PHOTO, "FOTO 823a ABCDEFGH\\x00\\x00\\x02\\x24", false},
+    });
     }
     
 }

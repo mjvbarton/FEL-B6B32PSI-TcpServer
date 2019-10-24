@@ -114,7 +114,7 @@ public class RequestTest {
             case INFO:
                 return message.split("^INFO\\s")[0].trim();
             case PHOTO:
-                return message.split("^PHOTO\\s")[0].trim();
+                return message.split("^FOTO\\s")[0].trim();
             case USERNAME:
             case PASSWORD:
                 return message.trim();
