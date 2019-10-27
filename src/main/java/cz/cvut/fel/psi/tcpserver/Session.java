@@ -40,6 +40,8 @@ public class Session extends Thread implements Serializable{
     private OutputStream out;    
     private final Date established;   
     
+    private boolean usernameFailed = false;
+    
     private User user;
     
     private Response state;
@@ -67,7 +69,59 @@ public class Session extends Thread implements Serializable{
                 socket.setSoTimeout(TIMEOUT_SECONDS);
                 while ((state.equals(ACCEPTING_USERNAME) || state.equals(ACCEPTING_PASSWORD) || state.equals(ACCEPTING_MESSAGES))
                         && socket.isInputShutdown()) {
-                    req = acceptRequest();
+                    try{
+                        req = acceptRequest();
+                    } catch (RequestSyntaxException ex){
+                        
+                        // Username validation
+                        if(state == ACCEPTING_USERNAME){
+                            usernameFailed = true;
+                            state = ACCEPTING_PASSWORD;
+                            continue;
+                        } else {
+                            throw ex;
+                        }
+                    }
+                    switch(state){
+                        case ACCEPTING_USERNAME:
+                            if(req.getType() == RequestType.USERNAME){
+                                user = new User(req);
+                                state = ACCEPTING_PASSWORD;
+                            } else {
+                                throw new RequestSyntaxException("Expected USERNAME message.");
+                            }
+                            break;
+                        
+                        case ACCEPTING_PASSWORD:
+                            if(req.getType() == RequestType.PASSWORD){
+                                if(usernameFailed || user == null || user.getPassword() == req.getData()){
+                                    state = ACCEPTING_MESSAGES;
+                                } else {
+                                    throw new UnauthenticatedException("Authentication failed. For user: " + user);
+                                }
+                                
+                            } else {
+                                throw new RequestSyntaxException("Expected PASSWORD message.");
+                            }
+                            break;
+                        
+                        case ACCEPTING_MESSAGES:
+                            if(null == req.getType()){
+                                throw new RequestSyntaxException("Expected PASSWORD message.");
+                            } else switch (req.getType()) {
+                            case INFO:
+                                LOG.log(Level.INFO, "Session {0}: Info message captured. Message info: {1}", new Object[]{this, req});
+                                break;
+                            case PHOTO:
+                                LOG.log(Level.INFO, "Session {0}: Photo message captured.", new Object[]{this});
+                                LOG.log(Level.SEVERE, "Session {0}: Photo message processing not impemented yet!", new Object[]{this});
+                                // TODO: Add logic of photo capturing here
+                                
+                                break;
+                            default:
+                                throw new RequestSyntaxException("Expected PASSWORD message.");
+                        }                                                                                              
+                    }
                 }
             } catch (SocketException socketException) {
                 LOG.log(Level.WARNING, "Session {0} timeout.", new Object[]{this});
@@ -90,9 +144,7 @@ public class Session extends Thread implements Serializable{
             } finally {                                
                 LOG.log(Level.INFO, "Session {0} closed at {1}.", new Object[]{this, new Date()});
                 socket.close();
-            }
-        
-            
+            }                    
         } catch (IOException ex) {
             LOG.log(Level.SEVERE, "Error while writing to input/output stream.", ex);
         }
@@ -105,7 +157,7 @@ public class Session extends Thread implements Serializable{
 
     @Override
     public String toString() {
-        
+        return null;
     }
 
     @Override
