@@ -10,10 +10,10 @@ import java.util.regex.Pattern;
  */
 public enum RequestType {
         
-    USERNAME("(^.*)"),
+    USERNAME("(^Robot)(\\s*\\w+)"),
     PASSWORD("(^\\d+$)"),
     INFO("(^INFO)\\s([^\\r\\n])*"),
-    PHOTO("^FOTO\\s\\d+\\s.+$");
+    PHOTO("^FOTO\\s\\d+\\s[^\\s]+$");
     
     private final Pattern syntax;
         
@@ -23,7 +23,7 @@ public enum RequestType {
     }
     
     public boolean checkSyntax(String message){
-        Matcher m = syntax.matcher(message);        
-        return m.matches();
+        Matcher m = syntax.matcher(message);
+        return m.find();
     }
 }

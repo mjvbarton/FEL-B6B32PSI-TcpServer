@@ -1,9 +1,6 @@
 package cz.cvut.fel.psi.tcpserver;
 
-import cz.cvut.fel.psi.tcpserver.exceptions.UnauthenticatedException;
 import java.io.Serializable;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  *
@@ -11,9 +8,6 @@ import java.util.regex.Pattern;
  */
 public class User implements Serializable{
     private final String username;
-    private final Pattern USERNAME_PATTERN = Pattern.compile("^Robot.*");
-    
-    private boolean authorized = false;
     
     public User(String username){
         this.username = username;
@@ -27,14 +21,7 @@ public class User implements Serializable{
         }
     }
     
-    public void authorize(String password) throws UnauthenticatedException{
-        Matcher m = USERNAME_PATTERN.matcher(username);
-        if(m.matches() == false || getPassword().equals(password) == false){
-            throw new UnauthenticatedException("Authentication failed for user " + this);
-        }
-    }
-           
-    private String getPassword(){
+    public String getPassword(){
         byte[] bytes = username.getBytes();
         int sum = 0;
         for(byte b : bytes){

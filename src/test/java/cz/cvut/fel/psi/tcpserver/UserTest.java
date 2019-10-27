@@ -6,9 +6,6 @@
 package cz.cvut.fel.psi.tcpserver;
 
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
-import cz.cvut.fel.psi.tcpserver.exceptions.UnauthenticatedException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -53,57 +50,13 @@ public class UserTest {
      * Test of getPassword method, of class User.    
      */
     @Test
-    public void testAuthorize_validUsername_validPassword_noExceptionThrown() {              
-        try {
-            instance.authorize(expectedPassword);
-            assertTrue("No exception was thrown during User.authorize() for username: " + username + " password: " + expectedPassword, true);
-        } catch (UnauthenticatedException ex) {
-            fail("No exception should be thrown for user: " + username + " password: " + expectedPassword);
-        }
-    }
-    
-    /**
-     * Test of getPassword method, of class User.
-     */
-    @Test
-    public void testAuthorize_nonValidUsername_validPassword_UnauthenticatedExceptionThrown() {
-        User user = new User("Ja jsem Robot Emil cislo 33");
-        try {
-            user.authorize(expectedPassword);
-            fail("Unauthenticated exception should be thrown for user: " + user + " password: " + expectedPassword);
-        } catch (UnauthenticatedException ex) {
-            assertTrue("Exception " + ex + " thrown for user: " + user + " password: " + expectedPassword, true);
-        }
-    }
-    
-    /**
-     * Test of getPassword method, of class User.
-     */
-    @Test
-    public void testAuthorize_emptyUsername_validPassword_UnauthenticatedExceptionThrown() {
-        User user = new User("");
-        try {
-            user.authorize(expectedPassword);
-            fail("Unauthenticated exception should be thrown for user: " + user + " password: " + expectedPassword);
-        } catch (UnauthenticatedException ex) {
-            assertTrue("Exception " + ex + " thrown for user: " + user + " password: " + expectedPassword, true);
-        }
-    }
-    
-    /**
-     * Test of getPassword method, of class User.
-     */
-    @Test
-    public void testAuthorize_validUsername_nonValidPassword_UnauthenticatedExceptionThrown() {
+    public void testGetPassword_validUser_gotPasswordMatchesExpectedPassword() {      
+        System.out.println("testGetPassword_validUser_gotPasswordMatchesExpectedPassword");
         User user = new User(username);
-        try {
-            user.authorize("1245a");
-            fail("Unauthenticated exception should be thrown for user: " + user + " password: " + "1245a");
-        } catch (UnauthenticatedException ex) {
-            assertTrue("Exception " + ex + " thrown for user: " + user + " password: " + "1245a", true);
-        }
+        String gotPassword = user.getPassword();
+        Assert.assertEquals("Expected password matches password retrieved from User.getPassword():", expectedPassword, gotPassword);
     }
-    
+
     /**
      * Test of toString method, of class User.
      */
@@ -146,7 +99,8 @@ public class UserTest {
         String message = username;
         Request request = new Request(username);
         User requestUser = new User(request);
-        assertEquals("Usernames of user for username: " + username + " matching.", username, requestUser.toString());        
+        assertEquals("Usernames of user for username: " + username + " matching.", username, requestUser.toString());
+        assertEquals("Passwords of user for username: " + username + " matching.", expectedPassword, requestUser.getPassword());
     }
     
 }
