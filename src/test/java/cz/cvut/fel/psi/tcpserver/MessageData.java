@@ -18,7 +18,7 @@ public class MessageData {
             {RequestType.USERNAME, "Robot Emil cislo 33", true},
             {RequestType.USERNAME, "RobotEmil cislo 33", true},
             {RequestType.USERNAME, "Robot345", true},
-            {RequestType.USERNAME, "Ja jsem Robot Emil cislo 33", false},
+            {RequestType.USERNAME, "Ja jsem Robot Emil cislo 33", true},
             {RequestType.PASSWORD, "1645", true},
             {RequestType.PASSWORD, "1645a", false},
             {RequestType.INFO, "INFO 2014-02-19 03:35 blíží se jiný robot", true},
