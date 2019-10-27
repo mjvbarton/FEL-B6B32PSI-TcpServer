@@ -40,8 +40,8 @@ public class Request {
     private String resolveData(RequestType type, String rawRequest){
         switch(type){
             case INFO:                
-            case PHOTO:                            
-                return rawRequest.split("^[a-zA-z]+\\s")[0];
+            case PHOTO:                
+                return rawRequest.split("^[a-zA-z]+\\s")[1];
             case USERNAME:
             case PASSWORD:
                 return rawRequest;
