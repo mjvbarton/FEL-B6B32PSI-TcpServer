@@ -39,6 +39,9 @@ public class RequestTest {
     @Parameter(value = 2)
     public boolean isValid;
     
+    @Parameter(value = 3)
+    public String expectedData;
+    
     public RequestTest() {
     }
     
@@ -71,7 +74,7 @@ public class RequestTest {
         try {
             Request instance = new Request(message);
             if(isValid){
-                Assert.assertEquals("Type of instance matches the type given:", requestType, instance.getType());
+                Assert.assertEquals("Type of instance matches the type given:", requestType, instance.getType());                
             } else {
                 fail("Missing exception for non valid of message: " + message);
             }
@@ -93,7 +96,7 @@ public class RequestTest {
         try {
             Request instance = new Request(message);
             if (isValid) {
-                String expected = getExpectedData();
+                String expected = expectedData;
                 String returned = instance.getData();
                 Assert.assertEquals("Expected data matches data returned from request message: " + message, expected, returned);
             } else {

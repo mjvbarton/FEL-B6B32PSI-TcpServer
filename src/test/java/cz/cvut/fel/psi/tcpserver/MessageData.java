@@ -15,21 +15,21 @@ import java.util.Collection;
 public class MessageData {           
     public static Collection getData(){
         return Arrays.asList(new Object[][]{
-            {RequestType.USERNAME, "Robot Emil cislo 33", true},
-            {RequestType.USERNAME, "RobotEmil cislo 33", true},
-            {RequestType.USERNAME, "Robot345", true},
-            {RequestType.USERNAME, "Ja jsem Robot Emil cislo 33", false},
-            {RequestType.PASSWORD, "1645", true},
-            {RequestType.PASSWORD, "1645a", false},
-            {RequestType.INFO, "INFO 2014-02-19 03:35 blíží se jiný robot", true},
-            {RequestType.INFO, "Moje INFO 2014-02-19 03:35 blíží se jiný robot", false},
-            {RequestType.INFO, "2014-02-19 03:35 blíží se jiný robot", false},
-            {RequestType.INFO, "INFO2014-02-19 03:35 blíží se jiný robot", false},
-            {RequestType.PHOTO, "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x24", true},
-            {RequestType.PHOTO, "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x12", true},
-            {RequestType.PHOTO, "FOTO 823 ABCDEFGH\\x00\\x0 0\\x02\\x24", false},
-            {RequestType.PHOTO, "FOTO823 ABCDEFGH\\x00\\x00\\x02\\x24", false},
-            {RequestType.PHOTO, "FOTO 823a ABCDEFGH\\x00\\x00\\x02\\x24", false},
+            {RequestType.USERNAME, "Robot Emil cislo 33", true, "Robot Emil cislo 33"},
+            {RequestType.USERNAME, "RobotEmil cislo 33", true, "RobotEmil cislo 33"},         
+            {RequestType.USERNAME, "Robot345", true, "Robot345"},
+            {RequestType.USERNAME, "Ja jsem Robot Emil cislo 33", false,  null},
+            {RequestType.PASSWORD, "1645", true, "1645"},
+            {RequestType.PASSWORD, "1645a", false, null},
+            {RequestType.INFO, "INFO 2014-02-19 03:35 blíží se jiný robot", true, "2014-02-19 03:35 blíží se jiný robot"},
+            {RequestType.INFO, "Moje INFO 2014-02-19 03:35 blíží se jiný robot", false, null},
+            {RequestType.INFO, "2014-02-19 03:35 blíží se jiný robot", false, null},
+            {RequestType.INFO, "INFO2014-02-19 03:35 blíží se jiný robot", false, null},
+            {RequestType.PHOTO, "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x24", true, "823 ABCDEFGH\\x00\\x00\\x02\\x24"},
+            {RequestType.PHOTO, "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x12", true, "823 ABCDEFGH\\x00\\x00\\x02\\x12"},
+            {RequestType.PHOTO, "FOTO 823 ABCDEFGH\\x00\\x0 0\\x02\\x24", false, null},
+            {RequestType.PHOTO, "FOTO823 ABCDEFGH\\x00\\x00\\x02\\x24", false, null},
+            {RequestType.PHOTO, "FOTO 823a ABCDEFGH\\x00\\x00\\x02\\x24", false, null},
     });
     }
     

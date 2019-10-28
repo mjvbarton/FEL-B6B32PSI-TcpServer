@@ -41,7 +41,7 @@ public class Request {
         switch(type){
             case INFO:                
             case PHOTO:                            
-                return rawRequest.split("^[a-zA-z]+\\s")[0];
+                return rawRequest.split("^[A-Z]+\\s")[1];
             case USERNAME:
             case PASSWORD:
                 return rawRequest;
