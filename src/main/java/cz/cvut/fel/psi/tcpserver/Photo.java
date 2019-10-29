@@ -49,4 +49,8 @@ public class Photo {
     public Integer getChecksum() {
         return checksum;
     }        
+
+    void flush() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
 }

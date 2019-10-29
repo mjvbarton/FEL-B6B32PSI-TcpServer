@@ -5,6 +5,8 @@
  */
 package cz.cvut.fel.psi.tcpserver;
 
+import java.util.List;
+
 /**
  *
  * @author Matej
@@ -18,4 +20,7 @@ public class Server {
         // TODO code application logic here
     }
     
+    public void savePhotos(List<Photo> photos){
+        
+    }    
 }
