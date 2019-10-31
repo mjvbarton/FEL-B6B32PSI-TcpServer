@@ -4,8 +4,13 @@
 *.zargo~
 *.ldb
 
+# pctGen testCases
+*.prj
+
 # Exported diagrams
-# *.png
+diagrams/*.xml
+diagrams/*.DTD
+#diagrams/*.png
 
 # Intellij
 .idea/
