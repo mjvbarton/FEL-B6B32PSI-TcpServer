@@ -6,7 +6,7 @@
 package cz.cvut.fel.psi.tcpserver.states;
 
 import cz.cvut.fel.psi.tcpserver.Session;
-import cz.cvut.fel.psi.tcpserver.SessionRunException;
+import cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;

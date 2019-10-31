@@ -9,6 +9,7 @@ package cz.cvut.fel.psi.tcpserver;
  *
  * @author Matej
  */
+@Deprecated
 public enum Response_OLD {
     ACCEPTING_USERNAME(200, "LOGIN"),
     ACCEPTING_PASSWORD(201, "PASSWORD"),

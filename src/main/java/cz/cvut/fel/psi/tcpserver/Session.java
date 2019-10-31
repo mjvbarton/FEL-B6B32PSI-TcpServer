@@ -5,11 +5,11 @@
  */
 package cz.cvut.fel.psi.tcpserver;
 
-import static cz.cvut.fel.psi.tcpserver.Response_OLD.ACCEPTING_USERNAME;
+import cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException;
 import cz.cvut.fel.psi.tcpserver.exceptions.BadChecksumException;
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
-import cz.cvut.fel.psi.tcpserver.exceptions.UnauthenticatedException;
 import cz.cvut.fel.psi.tcpserver.states.Response;
+import cz.cvut.fel.psi.tcpserver.states.AcceptingUsername;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -45,17 +45,19 @@ public class Session extends Thread implements Serializable{
     
     private Scanner sc;
     
-    private final List<Photo> photos = new ArrayList();
-    
-    private boolean usernameFailed = false;
+    private final List<Photo> photos = new ArrayList();   
     
     private User user;
+       
     
-    private Response_OLD state;
-        
+    /**
+     * Initializes new session with specified socket and reference to server where the session is run.
+     * @param socket socket extracted from {@link Server.srvSocket}
+     * @param server reference to server
+     * @throws IOException if the session is not able to read/write to socket
+     */
     public Session(Socket socket, Server server) throws IOException{
-        super();
-        state = ACCEPTING_USERNAME;
+        super();        
         established = new Date();
         this.socket = socket;
         in = socket.getInputStream();
@@ -71,13 +73,22 @@ public class Session extends Thread implements Serializable{
     @Override
     public void run(){                    
         LOG.log(Level.INFO, "Connected session {0} to socket: {1}", new Object[]{this, socket});
-        LOG.log(Level.FINE, "Session {0} established: {1}", new Object[]{this, established});            
-        LOG.log(Level.FINE, "Session {0} state: {1}", new Object[]{this, state});        
+        LOG.log(Level.FINE, "Session {0} established: {1}", new Object[]{this, established});
+        try{
+            Response response = new AcceptingUsername(this);
+            sendResponse(response);            
+            while((response = response.next()) != null && !socket.isClosed() && isRunning){         
+                LOG.log(Level.FINEST, "Session {0} response: {1}", new Object[]{this, response});
+            }
+            close();
+        } catch (SessionRunException ex){
+            ex.printStackTrace();            
+        }
     }
     
     /**
      * Closes the session
-     * @throws cz.cvut.fel.psi.tcpserver.SessionRunException when the process fails
+     * @throws cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException
      */
     public synchronized void close() throws SessionRunException{
         try{
@@ -159,6 +170,10 @@ public class Session extends Thread implements Serializable{
         return name;        
     }
     
+    /**
+     * Generates session name as a MD5 hash of Session.established, Session.socket.localPort
+     * @return hashed String
+     */
     private String generateName(){
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
@@ -179,11 +194,19 @@ public class Session extends Thread implements Serializable{
     public int hashCode() {
         return name.hashCode();
     }
-
+        
+    /**
+     * Gets logged in user of the session
+     * @return user object or null if not initialised yet
+     */
     public User getUser() {
         return user;
     }
 
+    /**
+     * Sets user to the session
+     * @param user to be set
+     */
     public void setUser(User user) {
         this.user = user;
     }
@@ -199,5 +222,13 @@ public class Session extends Thread implements Serializable{
         } else {
             throw new BadChecksumException("Incomplete transfer for photo " + photo);
         }
+    }
+    
+    /**
+     * Return number of photos uploaded by this session.
+     * @return number of photos in the buffer
+     */
+    public int getPhotoCounter(){
+        return photos.size();
     }
 }

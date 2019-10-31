@@ -17,7 +17,7 @@ public class Photo {
     private final byte[] photo;
     private final Integer checksum;
             
-    public Photo(Request request) throws RequestSyntaxException{
+    public Photo(Request request, Session session) throws RequestSyntaxException{
         String[] data = request.getData().split("\\s");
         size = Integer.parseInt(data[0]);
         String[] nextData = data[1].split("\\\\x");

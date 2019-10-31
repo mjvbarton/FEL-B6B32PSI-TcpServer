@@ -35,6 +35,9 @@ public class RequestTypeTest {
     @Parameter(value = 2)
     public boolean hasCorrectSyntax;
     
+    @Parameter(value = 3)
+    public String expectedData;
+    
     public RequestTypeTest() {
         
     }

@@ -9,12 +9,10 @@ import cz.cvut.fel.psi.tcpserver.Photo;
 import cz.cvut.fel.psi.tcpserver.Request;
 import cz.cvut.fel.psi.tcpserver.RequestType;
 import cz.cvut.fel.psi.tcpserver.Session;
-import cz.cvut.fel.psi.tcpserver.SessionRunException;
+import cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException;
 import cz.cvut.fel.psi.tcpserver.exceptions.BadChecksumException;
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
 import java.util.NoSuchElementException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -70,7 +68,7 @@ public class AcceptingMessages extends Response {
                 break;
             
             case PHOTO:
-                session.addPhoto(new Photo(req));
+                session.addPhoto(new Photo(req, session));
                 break;
             
             default:

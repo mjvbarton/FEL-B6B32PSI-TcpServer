@@ -7,39 +7,27 @@ package cz.cvut.fel.psi.tcpserver;
 
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
 import junit.framework.Assert;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
-import static org.junit.Assert.*;
 import org.junit.Ignore;
+import org.junit.runner.RunWith;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.runners.MockitoJUnitRunner;
 
 /**
- *
+ * Test of {@link Photo} class.
  * @author Matej
  */
+@Ignore
+@RunWith(MockitoJUnitRunner.class)
 public class PhotoTest {
+    
+    @Mock
+    private Session session;
     
     public PhotoTest() {
     }
     
-    @BeforeClass
-    public static void setUpClass() {
-    }
-    
-    @AfterClass
-    public static void tearDownClass() {
-    }
-    
-    @Before
-    public void setUp() {
-    }
-    
-    @After
-    public void tearDown() {
-    }
-
     /**
      * Test of validateChecksum method, of class Photo.
      */
@@ -48,7 +36,8 @@ public class PhotoTest {
         String msg = "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x24";
         Request req = new Request(msg);
         
-        Photo instance = new Photo(req);
+        Mockito.when(session.getPhotoCounter()).thenReturn(0);
+        Photo instance = new Photo(req, session);
         Assert.assertTrue("For request " + msg + " expected valid checksum returned.", instance.validateChecksum());
     }
     
@@ -59,7 +48,8 @@ public class PhotoTest {
     public void testValidateChecksum_validRequest_validChecksumOfPhoto_falseReturned() throws RequestSyntaxException {
         String msg = "FOTO 823 ABCDEFGI\\x00\\x00\\x02\\x24";
         Request req = new Request(msg);        
-        Photo instance = new Photo(req);
+        Mockito.when(session.getPhotoCounter()).thenReturn(0);
+        Photo instance = new Photo(req, session);
         Assert.assertFalse("For request " + msg + " expected not-valid checksum returned.", instance.validateChecksum());
     }
 
@@ -72,7 +62,8 @@ public class PhotoTest {
         String msg = "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x24";
         Request req = new Request(msg);
         int expectedSize = 823;
-        Photo instance = new Photo(req);
+        Mockito.when(session.getPhotoCounter()).thenReturn(0);
+        Photo instance = new Photo(req, session);
         Assert.assertEquals("For request " + msg + " expected size equals size given.", expectedSize, instance.getSize());
     }
 
@@ -84,7 +75,8 @@ public class PhotoTest {
         String msg = "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x24";
         Request req = new Request(msg);
         String expectedPhoto = "ABCDEFGH";
-        Photo instance = new Photo(req);
+        Mockito.when(session.getPhotoCounter()).thenReturn(0);
+        Photo instance = new Photo(req, session);
         Assert.assertEquals("For request " + msg + " expected photo equals photo given.", expectedPhoto, new String(instance.getPhoto()));
     }
 
@@ -96,7 +88,8 @@ public class PhotoTest {
         String msg = "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x24";
         Request req = new Request(msg);
         Integer expectedChecksum = 548;
-        Photo instance = new Photo(req);
+        Mockito.when(session.getPhotoCounter()).thenReturn(0);
+        Photo instance = new Photo(req, session);
         Assert.assertEquals("For request " + msg + " expected checksum equals checksum given.", expectedChecksum, instance.getChecksum());
     }
     

@@ -8,7 +8,8 @@ package cz.cvut.fel.psi.tcpserver.states;
 import cz.cvut.fel.psi.tcpserver.Photo;
 import cz.cvut.fel.psi.tcpserver.Request;
 import cz.cvut.fel.psi.tcpserver.Session;
-import cz.cvut.fel.psi.tcpserver.SessionRunException;
+import cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException;
+import cz.cvut.fel.psi.tcpserver.exceptions.BadChecksumException;
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
 import java.util.NoSuchElementException;
 import org.junit.After;
@@ -21,6 +22,7 @@ import org.junit.Ignore;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
+import static org.mockito.Mockito.times;
 import org.mockito.runners.MockitoJUnitRunner;
 
 /**
@@ -33,7 +35,7 @@ public class AcceptingMessagesTest {
     private Session session;
     
     @Mock
-    private Photo photo;
+    private Request req;
     
     public AcceptingMessagesTest() {
     }
@@ -57,16 +59,48 @@ public class AcceptingMessagesTest {
      * Test of next method, of class AcceptingMessages.
      */   
     @Test
-    public void testNextValidPhotoMessage() throws NoSuchElementException, RequestSyntaxException, SessionRunException {
+    public void testNextValidPhotoMessage() throws NoSuchElementException, RequestSyntaxException, SessionRunException, BadChecksumException {
         String message = "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x24";
-        Mockito.when(session.acceptRequest()).thenReturn(new Request(message));
-        Mockito.when(session.addPhoto(photo));
+        Mockito.when(session.acceptRequest()).thenReturn(new Request(message));        
+        Mockito.doNothing().when(session).addPhoto(Mockito.any(Photo.class));
+        
         Response instance = new AcceptingMessages(session);
         Response returned = instance.next();
-        Mockito.verify(session).sendResponse(returned);
-        Mockito.verify(session).addPhoto(photo);
+        Mockito.verify(session, times(1)).sendResponse(returned);
+        
         assertNotNull("Returned is not null.", returned);
         assertTrue("Returned is an instance of AcceptingMessages", returned instanceof AcceptingMessages);
+    }
+    
+    /**
+     * Test of next method, of class AcceptingMessages.
+     */   
+    @Test
+    public void testNextValidPhotoMessageBadChecksum() throws NoSuchElementException, RequestSyntaxException, SessionRunException, BadChecksumException {
+        String message = "FOTO 823 ABCDEFGH\\x00\\x00\\x02\\x24";
+        Mockito.when(session.acceptRequest()).thenReturn(new Request(message));        
+        Mockito.doThrow(new BadChecksumException()).when(session).addPhoto(Mockito.any(Photo.class));
+        
+        Response instance = new AcceptingMessages(session);
+        Response returned = instance.next();
+        Mockito.verify(session, times(1)).sendResponse(returned);
+        
+        assertNotNull("Returned is not null.", returned);
+        assertTrue("Returned is an instance of Badchecksum", returned instanceof BadChecksum);
+    }
+    
+    /**
+     * Test of next method, of class AcceptingMessages.
+     */   
+    @Test
+    public void testNextInvalidMessage() throws NoSuchElementException, RequestSyntaxException, SessionRunException, BadChecksumException {        
+        Mockito.when(session.acceptRequest()).thenThrow(new RequestSyntaxException("ex"));
+                
+        Response instance = new AcceptingMessages(session);
+        Response returned = instance.next();       
+        
+        assertNotNull("Returned is not null.", returned);
+        assertTrue("Returned is an instance of RequestSyntaxError", returned instanceof RequestSyntaxError);
     }
     
     @Test

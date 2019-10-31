@@ -7,7 +7,7 @@ package cz.cvut.fel.psi.tcpserver.states;
 
 import cz.cvut.fel.psi.tcpserver.Request;
 import cz.cvut.fel.psi.tcpserver.Session;
-import cz.cvut.fel.psi.tcpserver.SessionRunException;
+import cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException;
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
 import java.util.NoSuchElementException;
 

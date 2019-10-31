@@ -6,18 +6,26 @@
 package cz.cvut.fel.psi.tcpserver;
 
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
+import cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException;
+import cz.cvut.fel.psi.tcpserver.states.AcceptingMessages;
+import cz.cvut.fel.psi.tcpserver.states.AcceptingPassword;
+import cz.cvut.fel.psi.tcpserver.states.AcceptingUsername;
+import cz.cvut.fel.psi.tcpserver.states.BadChecksum;
+import cz.cvut.fel.psi.tcpserver.states.RequestSyntaxError;
+import cz.cvut.fel.psi.tcpserver.states.Response;
+import cz.cvut.fel.psi.tcpserver.states.Unauthorized;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.NoSuchElementException;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.*;
 import org.junit.Ignore;
@@ -36,6 +44,13 @@ public class SessionTest {
     private ByteArrayOutputStream out;
     private final int localPort = 3999;
     
+    private Response uResponse;
+    private Response pResponse;
+    private Response mResponse;
+    private Response bResponse;
+    private Response esResponse;
+    private Response euResponse;
+    
     @Mock
     private Socket socket;
 
@@ -48,17 +63,19 @@ public class SessionTest {
         
     }
     
-    @BeforeClass
-    public static void setUpClass() {
-    }
-    
-    @AfterClass
-    public static void tearDownClass() {
+    private void generateResponses(Session instance){
+        uResponse = new AcceptingUsername(instance);
+        pResponse = new AcceptingPassword(instance);
+        mResponse = new AcceptingMessages(instance);
+        bResponse = new BadChecksum(instance);
+        esResponse = new RequestSyntaxError(instance);
+        euResponse = new Unauthorized(instance);
     }
     
     @Before
     public void setUp() throws IOException {
         in = new ByteArrayInputStream(new byte[]{});
+        out = new ByteArrayOutputStream();
         Mockito.when(socket.getInputStream()).thenReturn(in); 
         Mockito.when(socket.getOutputStream()).thenReturn(out);
         Mockito.when(socket.getLocalPort()).thenReturn(localPort);                
@@ -201,4 +218,43 @@ public class SessionTest {
         assertEquals("Expected session name equals session name given.", expected.hashCode(), instance.hashCode());
     }
     
+    @Test
+    public void testSendResponseWithSingleResponse() throws SessionRunException, IOException{
+        instance = new Session(socket, srv);
+        Response response = new AcceptingUsername(instance);
+        String expected = response.toString();
+        instance.sendResponse(response);        
+        assertEquals("Expected output equals output returned.", expected, out.toString());
+    }    
+    
+    @Test
+    public void testSendResponseWithMultipleResponses() throws SessionRunException, IOException{
+        instance = new Session(socket, srv);
+        generateResponses(instance);
+        List<Response> responses = new ArrayList();
+        responses.add(uResponse);
+        responses.add(pResponse);
+        responses.add(mResponse);
+        responses.add(mResponse);
+        responses.add(mResponse);
+        responses.add(bResponse);
+        responses.add(euResponse);
+        responses.add(esResponse);
+        
+        String expected = "";
+        for(Response r : responses){
+            expected += r.toString();
+            instance.sendResponse(r);
+        }                       
+        assertEquals("Expected output equals output returned.", expected, out.toString());
+    }
+    
+    /**
+     * <i>Not implemented yet.</i>
+     */
+    @Ignore
+    @Test
+    public void testAddPhoto(){
+        
+    }
 }
