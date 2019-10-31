@@ -14,8 +14,8 @@ import java.util.regex.Pattern;
  */
 public class Photo {
     private final int size;
-    private byte[] photo;
-    private Integer checksum;
+    private final byte[] photo;
+    private final Integer checksum;
             
     public Photo(Request request) throws RequestSyntaxException{
         String[] data = request.getData().split("\\s");

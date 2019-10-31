@@ -5,15 +5,11 @@
  */
 package cz.cvut.fel.psi.tcpserver;
 
-import static cz.cvut.fel.psi.tcpserver.Response.ACCEPTING_USERNAME;
-import static cz.cvut.fel.psi.tcpserver.Response.ACCEPTING_PASSWORD;
-import static cz.cvut.fel.psi.tcpserver.Response.ACCEPTING_MESSAGES;
-import static cz.cvut.fel.psi.tcpserver.Response.BAD_CHECKSUM;
-import static cz.cvut.fel.psi.tcpserver.Response.SYNTAX_ERROR;
-import static cz.cvut.fel.psi.tcpserver.Response.TIMEOUT;
-import static cz.cvut.fel.psi.tcpserver.Response.UNAUTHORIZED;
+import static cz.cvut.fel.psi.tcpserver.Response_OLD.ACCEPTING_USERNAME;
+import cz.cvut.fel.psi.tcpserver.exceptions.BadChecksumException;
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
 import cz.cvut.fel.psi.tcpserver.exceptions.UnauthenticatedException;
+import cz.cvut.fel.psi.tcpserver.states.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -45,6 +41,7 @@ public class Session extends Thread implements Serializable{
     private OutputStream out;    
     protected Date established;
     private final String name;
+    private boolean isRunning;
     
     private Scanner sc;
     
@@ -54,7 +51,7 @@ public class Session extends Thread implements Serializable{
     
     private User user;
     
-    private Response state;
+    private Response_OLD state;
         
     public Session(Socket socket, Server server) throws IOException{
         super();
@@ -65,147 +62,98 @@ public class Session extends Thread implements Serializable{
         out = socket.getOutputStream();
         name = generateName();        
         srv = server;
-        sc = new Scanner(in).useDelimiter("\\r\\n");
+        sc = new Scanner(in).useDelimiter("\\r\\n");       
     }
-            
+    
+    /**
+     * Represents the session runtime
+     */
     @Override
-    public void run() {
-        Request req = null;        
-        try {
-            LOG.log(Level.INFO, "Connected session {0} to socket: {1}", new Object[]{this, socket});
-            LOG.log(Level.FINE, "Session {0} established: {1}", new Object[]{this, established});            
-            LOG.log(Level.FINE, "Session {0} state: {1}", new Object[]{this, state});
-            
-            // Sending user a welcome message
-            out.write(ACCEPTING_USERNAME.toString().getBytes());
-            try {
-                socket.setSoTimeout(TIMEOUT_SECONDS);
-                while ((state.equals(ACCEPTING_USERNAME) || state.equals(ACCEPTING_PASSWORD) || state.equals(ACCEPTING_MESSAGES))
-                        && !socket.isInputShutdown()) {                    
-                    try{
-                        req = acceptRequest();
-                    } catch (RequestSyntaxException ex){
-                        
-                        // Username validation
-                        if(state == ACCEPTING_USERNAME){
-                            usernameFailed = true;
-                            state = ACCEPTING_PASSWORD;
-                            out.write(state.toString().getBytes());
-                            continue;
-                        } else if(state == ACCEPTING_PASSWORD) {
-                            throw new UnauthenticatedException("Wrong password syntax.");
-                        } else {
-                            throw ex;
-                        }                        
-                    } catch (NoSuchElementException ex){
-                        LOG.log(Level.FINE, "Session {0}: waiting for request. {1}", new Object[]{this, ex});
-                        continue;
-                    }
-                    switch(state){
-                        case ACCEPTING_USERNAME:
-                            if(req.getType() == RequestType.USERNAME){
-                                user = new User(req);
-                                state = ACCEPTING_PASSWORD;
-                                out.write(state.toString().getBytes());
-                            } else {
-                                throw new RequestSyntaxException("Expected USERNAME message.");
-                            }
-                            break;
-                        
-                        case ACCEPTING_PASSWORD:
-                            if(req.getType() == RequestType.PASSWORD){                                
-                                if(usernameFailed || user == null || !user.getPassword().equals(req.getData())){
-                                    throw new UnauthenticatedException("Authentication failed. For user: " + user);                                    
-                                } else {
-                                    state = ACCEPTING_MESSAGES;
-                                    out.write(state.toString().getBytes());
-                                }
-                                
-                            } else {
-                                throw new RequestSyntaxException("Expected PASSWORD message.");                                
-                            }
-                            break;
-                        
-                        case ACCEPTING_MESSAGES:
-                            if(null == req.getType()){
-                                throw new RequestSyntaxException("Expected PASSWORD message.");
-                            } else switch (req.getType()) {
-                            case INFO:
-                                LOG.log(Level.INFO, "Session {0}: Info message captured. Message info: {1}", new Object[]{this, req});
-                                out.write(state.toString().getBytes());
-                                break;
-                            case PHOTO:
-                                LOG.log(Level.INFO, "Session {0}: Photo message captured.", new Object[]{this});
-                                // LOG.log(Level.SEVERE, "Session {0}: Photo message processing not impemented yet!", new Object[]{this});
-                                // TODO: Add logic of photo capturing here
-                                Photo photo = new Photo(req);
-                                if(photo.validateChecksum()){
-                                    photos.add(photo);
-                                    out.write(state.toString().getBytes());
-                                } else {
-                                    photo.flush();
-                                    out.write(BAD_CHECKSUM.toString().getBytes());
-                                }                                
-                                break;
-                                
-//                            // This is never reached unless something is seriously wrong.
-//                            default:                                
-//                                throw new RequestSyntaxException("Incorrect syntax entered.");
-                        }                                                                                              
-                    }
-                }
-            } catch (SocketException socketException) {
-                LOG.log(Level.WARNING, "Session {0} timeout.", new Object[]{this});
-                LOG.log(Level.FINE, "Session {0} exception {1}.", new Object[]{this, socketException});
-                state = TIMEOUT;
-                out.write(state.toString().getBytes());
-                
-            } catch (RequestSyntaxException requestSyntaxException) {
-                LOG.log(Level.WARNING, "Session {0} syntax failed for request {1}.", new Object[]{this, req});
-                LOG.log(Level.FINE, "Session {0} exception {1}.", new Object[]{this, requestSyntaxException});
-                state = SYNTAX_ERROR;
-                out.write(state.toString().getBytes());
-                
-            } catch (UnauthenticatedException unauthenticatedException) {
-                LOG.log(Level.WARNING, "Session {0} authentication failed for user {1}.", new Object[]{this, user});
-                LOG.log(Level.FINE, "Session {0} exception {1}.", new Object[]{this, unauthenticatedException});
-                state = UNAUTHORIZED;
-                out.write(state.toString().getBytes());
-            
-            } catch (NoSuchElementException ex){
-                LOG.log(Level.FINE, "Session {0} exception {1}.", new Object[]{this, ex});
-                
-            } finally {                                
-                LOG.log(Level.INFO, "Session {0} closed at {1}.", new Object[]{this, new Date()});
+    public void run(){                    
+        LOG.log(Level.INFO, "Connected session {0} to socket: {1}", new Object[]{this, socket});
+        LOG.log(Level.FINE, "Session {0} established: {1}", new Object[]{this, established});            
+        LOG.log(Level.FINE, "Session {0} state: {1}", new Object[]{this, state});        
+    }
+    
+    /**
+     * Closes the session
+     * @throws cz.cvut.fel.psi.tcpserver.SessionRunException when the process fails
+     */
+    public synchronized void close() throws SessionRunException{
+        try{
+            if(isRunning){
+                isRunning = false;
+                in.close();
+                out.close();
                 socket.close();
-            }                    
-        } catch (IOException ex) {
-            LOG.log(Level.SEVERE, "Error while writing to input/output stream.", ex);
+            }
+        }   catch (IOException ex) {
+            LOG.log(Level.SEVERE, "Cannot close Session {0}", this);
+            throw new SessionRunException("Cannot close session " + this, ex);
         }
     }
     
+    /**
+     * Sends response to client
+     * @param response response to be sent. 
+     * @throws SessionRunException when the process fails
+     */
+    public void sendResponse(Response response) throws SessionRunException{        
+        try {
+            out.write(response.toString().getBytes());
+            LOG.log(Level.FINEST, "Sesion {0} response message sent: {1}", new Object[]{this, response});
+        } catch (IOException ex) {
+            throw new SessionRunException("Cannot send response.", ex);
+        }
+    }
     
+    /**
+     * Scans the input stream until there is a request to capture.
+     * @return new request captured from Socket.inputStream     
+     * @throws NoSuchElementException if there is no element
+     * @throws RequestSyntaxException if the syntax does not match
+     */
     public Request acceptRequest() throws NoSuchElementException, RequestSyntaxException{        
-        String message = sc.next();
+        String message = sc.next();        
         return new Request(message);        
     }
 
+    /**
+     * <i>Method for testing.</i> Returns the input stream of the session.
+     * @return input stream of the session
+     */
     protected InputStream getIn() {
         return in;
     }
 
+    /**
+     * <i>Method for testing.</i> Sets the input stream of the session.
+     * @param in input stream to mock the session.
+     */
     protected void setIn(InputStream in) {
         this.in = in;
     }
 
+    /**
+     * <i>Method for testing.</i> Returns the output stream of the session.
+     * @return output stream of the session
+     */
     protected OutputStream getOut() {
         return out;
     }
 
+    /**
+     * <i>Method for testing.</i> Sets the output stream of the session.
+     * @param out output stream to mock the session.
+     */
     protected void setOut(OutputStream out) {
         this.out = out;
     }
-        
+    
+    /**
+     * Returns hashed session name from established date and socket local port number.
+     * @return session name
+     */
     @Override
     public String toString() {
         return name;        
@@ -223,9 +171,33 @@ public class Session extends Thread implements Serializable{
         }
     }
 
+    /**
+     * Returns hashCode of Session.name
+     * @return hashCode of Session.name
+     */
     @Override
     public int hashCode() {
         return name.hashCode();
     }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
     
+    /**
+     * Adds photo to session save queue. The save of photo is currenty temporary.
+     * @param photo retrieved from request
+     * @throws BadChecksumException when the photo is not complete
+     */
+    public void addPhoto(Photo photo) throws BadChecksumException{
+        if(photo.validateChecksum()){
+            photos.add(photo);
+        } else {
+            throw new BadChecksumException("Incomplete transfer for photo " + photo);
+        }
+    }
 }

@@ -17,7 +17,7 @@ public class User implements Serializable{
         if(request.getType() == RequestType.USERNAME){
             this.username = request.getData();
         } else {
-            throw new RuntimeException();
+            throw new IllegalStateException();
         }
     }
     
