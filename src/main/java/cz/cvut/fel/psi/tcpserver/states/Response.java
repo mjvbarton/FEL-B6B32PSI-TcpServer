@@ -35,7 +35,7 @@ public abstract class Response {
      */
     @Override
     public String toString() {
-        return code + " " + message.toUpperCase() + " \r\n";
+        return code + " " + message.toUpperCase() + "\r\n";
     }
       
     

@@ -15,7 +15,7 @@ import java.net.SocketTimeoutException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Base64;
+//import java.util.Base64;
 import java.util.Date;
 import java.util.InputMismatchException;
 import java.util.List;
@@ -79,9 +79,9 @@ class Server {
      */
     public static void main(String[] args) throws ServerRunException {
         Logger rootLogger = Logger.getLogger("");
-        rootLogger.setLevel(Level.FINEST);
+        rootLogger.setLevel(Level.INFO);
         for (Handler h : rootLogger.getHandlers()) {
-            h.setLevel(Level.FINEST);
+            h.setLevel(Level.INFO);
         }
         int port;
         if (args.length > 0) {
@@ -211,7 +211,8 @@ class Request {
         switch (type) {
             case INFO:
             case PHOTO:
-                return rawRequest.split("^[A-Z]+\\s")[1];
+                String[] parsedRequest = rawRequest.split("^[A-Z]+\\s");
+                return parsedRequest.length > 1 ? parsedRequest[1] : "";
             case USERNAME:
             case PASSWORD:
                 return rawRequest;
@@ -251,6 +252,7 @@ enum RequestType {
         Matcher m = syntax.matcher(message);
         return m.find();
     }
+    
 }
 
 /**
@@ -425,7 +427,8 @@ class Session extends Thread implements Serializable{
             Random randomizer = new Random();
             md.update(("Session " + socket.getLocalPort() + " " + established + randomizer.nextInt()).getBytes());
             byte[] digest = md.digest();
-            return Base64.getEncoder().encodeToString(digest).toUpperCase();
+            //return Base64.getEncoder().encodeToString(digest).toUpperCase();
+            return new String(digest).toUpperCase();
         } catch (NoSuchAlgorithmException ex) {
             LOG.log(Level.SEVERE, "Something is terribly wrong!!!", ex);
             throw new RuntimeException("Session.generateName() failed. " + ex);
@@ -496,7 +499,8 @@ class User implements Serializable {
         if (request.getType() == RequestType.USERNAME) {
             this.username = request.getData();
         } else {
-            throw new IllegalStateException();
+            //throw new IllegalStateException();
+            this.username = "";
         }
     }
 
@@ -736,7 +740,7 @@ abstract class Response {
      */
     @Override
     public String toString() {
-        return code + " " + message.toUpperCase() + " \r\n";
+        return code + " " + message.toUpperCase() + "\r\n";
     }
 
     /**
