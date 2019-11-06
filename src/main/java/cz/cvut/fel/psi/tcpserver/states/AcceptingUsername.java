@@ -27,19 +27,21 @@ public class AcceptingUsername extends Response{
     @Override
     public Response next(){
         try {
-            Request req = session.acceptRequest();
-            session.setUser(new User(req));            
-            Response next = new AcceptingPassword(session);
-            session.sendResponse(next);
-            return next;
+            try{
+                Request req = session.acceptRequest();
+                session.setUser(new User(req));            
+                Response next = new AcceptingPassword(session);
+                session.sendResponse(next);
+                return next;
             
-        } catch (NoSuchElementException ex) {
-            return this;
-            
-        } catch (RequestSyntaxException ex) {
-            //session.setUser(new User(""));
-            return new AcceptingPassword(session, true);
-            
+            } catch (NoSuchElementException ex) {
+                return null;
+
+            } catch (RequestSyntaxException ex) {                
+                Response next = new AcceptingPassword(session);
+                session.sendResponse(next);
+                return new AcceptingPassword(session, true);
+            }
         } catch (SessionRunException ex) {
             ex.printStackTrace();
             return null;

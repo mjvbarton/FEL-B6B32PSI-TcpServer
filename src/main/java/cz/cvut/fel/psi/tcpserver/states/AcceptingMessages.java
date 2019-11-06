@@ -46,7 +46,7 @@ public class AcceptingMessages extends Response {
                     return new RequestSyntaxError(session);
                 }
             } catch (NoSuchElementException ex) {
-                return this;
+                return null;
 
             } catch (RequestSyntaxException ex) {
                 return new RequestSyntaxError(session);

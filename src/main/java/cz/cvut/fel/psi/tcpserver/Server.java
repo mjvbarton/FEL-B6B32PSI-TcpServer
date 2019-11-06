@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
+import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -14,6 +15,7 @@ import java.util.logging.Logger;
  */
 public class Server {
     public static final Logger LOG = Logger.getLogger(Server.class.getName());
+    public static final int SESSION_TIMEOUT_SECONDS = 45;
     
     public static final String FILE_STORAGE_PATH = "";
     public static final int DEFAULT_PORT_NUMBER = 3999;
@@ -21,8 +23,14 @@ public class Server {
     private final int serverPort;
     private ServerSocket srvSocket;
 
-    public Server(int serverPort) {
+    public Server(int serverPort) throws ServerRunException {
         this.serverPort = serverPort;
+        try {
+            srvSocket = new ServerSocket(serverPort);
+        } catch (IOException ex) {
+            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, "Unable to start server.");
+            throw new ServerRunException("Unable to start server", ex);
+        }
     }
            
     /**
@@ -31,6 +39,11 @@ public class Server {
      * @throws cz.cvut.fel.psi.tcpserver.exceptions.ServerRunException if the process fails
      */
     public static void main(String[] args) throws ServerRunException {
+        Logger rootLogger = Logger.getLogger("");
+        rootLogger.setLevel(Level.FINEST);
+        for(Handler h : rootLogger.getHandlers()){
+            h.setLevel(Level.FINEST);
+        }
         int port;
         if(args.length > 0){
             try{

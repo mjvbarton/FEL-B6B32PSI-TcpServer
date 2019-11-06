@@ -47,7 +47,7 @@ public class AcceptingPassword extends Response{
                 return new Unauthorized(session);
             }
         } catch (NoSuchElementException ex) {            
-            return this;
+            return null;
             
         } catch (RequestSyntaxException ex) {
             return new Unauthorized(session);

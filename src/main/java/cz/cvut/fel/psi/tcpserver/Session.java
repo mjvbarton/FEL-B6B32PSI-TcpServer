@@ -10,6 +10,7 @@ import cz.cvut.fel.psi.tcpserver.exceptions.BadChecksumException;
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
 import cz.cvut.fel.psi.tcpserver.states.Response;
 import cz.cvut.fel.psi.tcpserver.states.AcceptingUsername;
+import cz.cvut.fel.psi.tcpserver.states.Timeout;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -20,10 +21,13 @@ import java.net.SocketTimeoutException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Random;
 import java.util.Scanner;
+import java.util.logging.Filter;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -32,8 +36,7 @@ import java.util.logging.Logger;
  * @author Matej
  */
 public class Session extends Thread implements Serializable{
-    private static final Logger LOG = Logger.getLogger(Session.class.getName());
-    private static int TIMEOUT_SECONDS = 0;
+    private static final Logger LOG = Logger.getLogger(Session.class.getName());    
     
     private Server srv;    
     private Socket socket; 
@@ -57,7 +60,7 @@ public class Session extends Thread implements Serializable{
      * @throws IOException if the session is not able to read/write to socket
      */
     public Session(Socket socket, Server server) throws IOException{
-        super();        
+        super();                
         established = new Date();
         this.socket = socket;
         in = socket.getInputStream();
@@ -72,17 +75,35 @@ public class Session extends Thread implements Serializable{
      */
     @Override
     public void run(){                    
-        LOG.log(Level.INFO, "Connected session {0} to socket: {1}", new Object[]{this, socket});
+        LOG.log(Level.INFO, "Connected session {0} to socket: {1}", new Object[]{this, socket.getPort()});
         LOG.log(Level.FINE, "Session {0} established: {1}", new Object[]{this, established});
+        isRunning = true;
         try{
+            socket.setSoTimeout(Server.SESSION_TIMEOUT_SECONDS * 1000);
             Response response = new AcceptingUsername(this);
             sendResponse(response);            
-            while((response = response.next()) != null && !socket.isClosed() && isRunning){         
+            while((response = response.next()) != null && socket.isConnected() && isRunning){         
                 LOG.log(Level.FINEST, "Session {0} response: {1}", new Object[]{this, response});
+                LOG.log(Level.FINEST, "Session {0} socket is connected {1}", new Object[]{this, socket.isConnected()});
             }
+            in.read();
             close();
         } catch (SessionRunException ex){
-            ex.printStackTrace();            
+            ex.printStackTrace(); 
+            
+        } catch (IOException ex) {
+            if(ex instanceof SocketTimeoutException){
+                try {
+                    Response response = new Timeout(this);
+                    response.next();
+                    close();
+                } catch (SessionRunException ex1) {
+                    ex.printStackTrace();
+                }
+            } else {
+                LOG.log(Level.SEVERE, "Unknown error catched. {0}", ex);
+                ex.printStackTrace();
+            }
         }
     }
     
@@ -93,6 +114,7 @@ public class Session extends Thread implements Serializable{
     public synchronized void close() throws SessionRunException{
         try{
             if(isRunning){
+                LOG.log(Level.INFO, "Session {0}: Closing session.", this);
                 isRunning = false;
                 in.close();
                 out.close();
@@ -125,7 +147,8 @@ public class Session extends Thread implements Serializable{
      * @throws RequestSyntaxException if the syntax does not match
      */
     public Request acceptRequest() throws NoSuchElementException, RequestSyntaxException{        
-        String message = sc.next();        
+        String message = sc.next();
+        LOG.log(Level.FINEST, "Session {0}: Read raw message {1}", new Object[]{this, message});
         return new Request(message);        
     }
 
@@ -177,9 +200,10 @@ public class Session extends Thread implements Serializable{
     private String generateName(){
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
-            md.update(("Session " + socket.getLocalPort() + " " + established).getBytes());
+            Random randomizer = new Random();
+            md.update(("Session " + socket.getLocalPort() + " " + established + randomizer.nextInt()).getBytes());
             byte[] digest = md.digest();
-            return new String(digest).toUpperCase();
+            return Base64.getEncoder().encodeToString(digest).toUpperCase();
         } catch (NoSuchAlgorithmException ex) {
             LOG.log(Level.SEVERE, "Something is terribly wrong!!!", ex);
             throw new RuntimeException("Session.generateName() failed. " + ex);
@@ -218,7 +242,8 @@ public class Session extends Thread implements Serializable{
      */
     public void addPhoto(Photo photo) throws BadChecksumException{
         if(photo.validateChecksum()){
-            photos.add(photo);
+            LOG.log(Level.INFO, "Session {0}: Photo {1} uploaded.", new Object[]{this, photo});
+            //photos.add(photo);
         } else {
             throw new BadChecksumException("Incomplete transfer for photo " + photo);
         }
