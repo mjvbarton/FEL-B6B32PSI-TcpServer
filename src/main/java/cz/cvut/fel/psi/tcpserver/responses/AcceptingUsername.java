@@ -1,36 +1,38 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package cz.cvut.fel.psi.tcpserver.responses;
 
-import cz.cvut.fel.psi.tcpserver.Request;
+import cz.cvut.fel.psi.tcpserver.requests.Request;
 import cz.cvut.fel.psi.tcpserver.Session;
 import cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException;
 import cz.cvut.fel.psi.tcpserver.User;
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
+import cz.cvut.fel.psi.tcpserver.exceptions.SessionClosedException;
+import cz.cvut.fel.psi.tcpserver.requests.UsernameRequest;
 import java.net.SocketTimeoutException;
 import java.util.NoSuchElementException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- *
- * @author Matej
+ * Represents response {@code '200 LOGIN'}
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 public class AcceptingUsername extends Response{
 
+    /**
+     * Creates new {@code AcceptingUsername} response.
+     * @param session reference to parent {@code Session}
+     */
     public AcceptingUsername(Session session) {
         super(session, 200, "login");
     }        
             
     @Override
-    public Response next(){
+    public Response next() throws SessionClosedException{
         try {
             try{
                 Request req = session.acceptRequest();
-                session.setUser(new User(req));            
+                UsernameRequest urq = (UsernameRequest) req;                
+                session.setUser(urq.getData());                 
                 Response next = new AcceptingPassword(session);
                 session.sendResponse(next);
                 return next;

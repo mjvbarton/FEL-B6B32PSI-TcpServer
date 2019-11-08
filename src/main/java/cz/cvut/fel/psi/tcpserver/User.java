@@ -4,23 +4,26 @@ import java.io.Serializable;
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 public class User implements Serializable{
     private final String username;
+    private final String password;
     
-    public User(String username){
+    public User(String username, String password){
         this.username = username;
+        this.password = password;
     }
     
-    public User(Request request){
-        if(request.getType() == RequestType.USERNAME){
-            this.username = request.getData();
-        } else {
-            //throw new IllegalStateException();
-            this.username = "";
-        }
-    }
+//    public User(Request request){
+//        if(request.getType() == RequestType.USERNAME){
+//            this.username = request.getData();
+//        } else {
+//            //throw new IllegalStateException();
+//            this.username = "";
+//        }
+//        this.password = "";
+//    }
     
     public String getPassword(){
         byte[] bytes = username.getBytes();

@@ -1,18 +1,17 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package cz.cvut.fel.psi.tcpserver.responses;
 
 import cz.cvut.fel.psi.tcpserver.Session;
 
 /**
- *
- * @author Matej
+ * Represents response {@code '300 BAD CHECKSUM'}
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 public class BadChecksum extends AcceptingMessages {
 
+    /**
+     * Creates new {@code BadChecksum} response.
+     * @param session reference to parent {@code Session}
+     */
     public BadChecksum(Session session) {
         super(session, 300, "bad checksum");
     }    

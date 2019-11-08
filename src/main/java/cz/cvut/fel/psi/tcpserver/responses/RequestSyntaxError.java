@@ -1,18 +1,16 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package cz.cvut.fel.psi.tcpserver.responses;
 
 import cz.cvut.fel.psi.tcpserver.Session;
+import cz.cvut.fel.psi.tcpserver.exceptions.SessionClosedException;
 import cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- *
- * @author Matej
+ * Represents response {@code '501 SYNTAX ERROR'}
+ * <p>
+ * As this is an error response it leads to cause of {@code Session.close()} by throwing {@code SessionClosedException}.
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 public class RequestSyntaxError extends Response{
     public RequestSyntaxError(Session session){
@@ -20,13 +18,13 @@ public class RequestSyntaxError extends Response{
     }
     
     @Override
-    public Response next(){
+    public Response next() throws SessionClosedException{
         try {
             session.sendResponse(this);
-            return null;
+            throw new SessionClosedException("Session needs to be closed.");
         } catch (SessionRunException ex) {
             ex.printStackTrace();
-            return null;
+            throw new SessionClosedException("Session needs to be closed because of an error.", ex);
         }
     }
     

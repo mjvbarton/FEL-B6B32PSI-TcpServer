@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 public class Robot {
 
@@ -47,7 +47,7 @@ public class Robot {
 /**
  * Represents a session manager of the server.
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class Server {
 
@@ -132,7 +132,7 @@ class Server {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class Photo {
 
@@ -180,7 +180,7 @@ class Photo {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class Request {
 
@@ -232,7 +232,7 @@ class Request {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 enum RequestType {
 
@@ -257,7 +257,7 @@ enum RequestType {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class Session extends Thread implements Serializable{
     private static final Logger LOG = Logger.getLogger(Session.class.getName());    
@@ -485,7 +485,7 @@ class Session extends Thread implements Serializable{
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class User implements Serializable {
 
@@ -531,7 +531,7 @@ class User implements Serializable {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class AcceptingMessages extends Response {
 
@@ -594,7 +594,7 @@ class AcceptingMessages extends Response {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class AcceptingPassword extends Response {
 
@@ -647,7 +647,7 @@ class AcceptingPassword extends Response {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class AcceptingUsername extends Response {
 
@@ -682,7 +682,7 @@ class AcceptingUsername extends Response {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class BadChecksum extends AcceptingMessages {
 
@@ -693,7 +693,7 @@ class BadChecksum extends AcceptingMessages {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class RequestSyntaxError extends Response {
 
@@ -717,7 +717,7 @@ class RequestSyntaxError extends Response {
 /**
  * Response from the state machine
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 abstract class Response {
 
@@ -754,7 +754,7 @@ abstract class Response {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class Timeout extends Response {
 
@@ -778,7 +778,7 @@ class Timeout extends Response {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class Unauthorized extends Response {
 
@@ -800,7 +800,7 @@ class Unauthorized extends Response {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class BadChecksumException extends Exception {
 
@@ -824,7 +824,7 @@ class BadChecksumException extends Exception {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class RequestSyntaxException extends Exception {
 
@@ -835,7 +835,7 @@ class RequestSyntaxException extends Exception {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class ServerRunException extends Exception {
 
@@ -864,7 +864,7 @@ class ServerRunException extends Exception {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class SessionRunException extends Exception {
 
@@ -876,7 +876,7 @@ class SessionRunException extends Exception {
 
 /**
  *
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 class UnauthenticatedException extends Exception {
 

@@ -1,13 +1,7 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package cz.cvut.fel.psi.tcpserver.exceptions;
 
-/**
- *
- * @author Matej
+/** 
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 public class BadChecksumException extends Exception {
 

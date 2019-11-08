@@ -1,22 +1,19 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package cz.cvut.fel.psi.tcpserver;
 
 import cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException;
 import cz.cvut.fel.psi.tcpserver.exceptions.BadChecksumException;
 import cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException;
+import cz.cvut.fel.psi.tcpserver.exceptions.SessionClosedException;
+import cz.cvut.fel.psi.tcpserver.requests.Request;
+import cz.cvut.fel.psi.tcpserver.requests.RequestFactory;
+import cz.cvut.fel.psi.tcpserver.requests.RequestOffset;
 import cz.cvut.fel.psi.tcpserver.responses.Response;
 import cz.cvut.fel.psi.tcpserver.responses.AcceptingUsername;
-import cz.cvut.fel.psi.tcpserver.responses.Timeout;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -24,16 +21,15 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.Scanner;
-import java.util.logging.Filter;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.lang.ArrayUtils;
 
 /**
- *
- * @author Matej
+ * Represents session of client at the server.
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 public class Session extends Thread implements Serializable{
     private static final Logger LOG = Logger.getLogger(Session.class.getName());    
@@ -41,7 +37,8 @@ public class Session extends Thread implements Serializable{
     private Server srv;    
     private Socket socket; 
     private InputStream in;
-    private OutputStream out;    
+    private OutputStream out;
+    private RequestFactory rf;
     protected Date established;
     private final String name;
     private boolean isRunning;
@@ -67,6 +64,7 @@ public class Session extends Thread implements Serializable{
         out = socket.getOutputStream();
         name = generateName();        
         srv = server;
+        rf = new RequestFactory(in);
         sc = new Scanner(in).useDelimiter("\\r\\n");       
     }
     
@@ -85,23 +83,21 @@ public class Session extends Thread implements Serializable{
             while((response = response.next()) != null && socket.isConnected() && isRunning){         
                 LOG.log(Level.FINEST, "Session {0} response: {1}", new Object[]{this, response});
                 LOG.log(Level.FINEST, "Session {0} socket is connected {1}", new Object[]{this, socket.isConnected()});
-            }
-            in.read();
+            }            
             close();
         } catch (SessionRunException ex){
+            LOG.log(Level.SEVERE, "Unknown error catched. {0}", ex);
             ex.printStackTrace(); 
             
-        } catch (IOException ex) {
-            if(ex instanceof SocketTimeoutException){
-                try {
-                    Response response = new Timeout(this);
-                    response.next();
-                    close();
-                } catch (SessionRunException ex1) {
-                    ex.printStackTrace();
-                }
-            } else {
-                LOG.log(Level.SEVERE, "Unknown error catched. {0}", ex);
+        } catch (IOException ex) {            
+            LOG.log(Level.SEVERE, "Unknown error catched. {0}", ex);
+            ex.printStackTrace();
+            
+        } catch (SessionClosedException ex) {
+            try {
+                close();
+            } catch (SessionRunException ex1) {
+               LOG.log(Level.SEVERE, "Unknown error catched. {0}", ex);
                 ex.printStackTrace();
             }
         }
@@ -143,13 +139,54 @@ public class Session extends Thread implements Serializable{
     /**
      * Scans the input stream until there is a request to capture.
      * @return new request captured from Socket.inputStream     
-     * @throws NoSuchElementException if there is no element
-     * @throws RequestSyntaxException if the syntax does not match
+     * @throws java.net.SocketTimeoutException if socket cannot be read due to timeout
+     * @throws cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException if reading fails
+     * @throws cz.cvut.fel.psi.tcpserver.exceptions.RequestSyntaxException if the syntax of request does not match
+     * @throws cz.cvut.fel.psi.tcpserver.exceptions.SessionClosedException
      */
-    public Request acceptRequest() throws NoSuchElementException, RequestSyntaxException{        
-        String message = sc.next();
-        LOG.log(Level.FINEST, "Session {0}: Read raw message {1}", new Object[]{this, message});
-        return new Request(message);        
+    public Request acceptRequest() throws SocketTimeoutException, RequestSyntaxException, SessionRunException, SessionClosedException{        
+        try {
+            Request req;
+            int checksum = 0;
+            List<Byte> bytes = new ArrayList();
+            Byte previousByte = 0;
+            boolean passwordRequest = false;
+
+            while (true) {                
+                if(bytes.size() == 5) break;
+                int val = in.read();
+                if(val < 0) throw new SessionClosedException("Session was closed by client");
+                byte[] lineseparator = new byte[]{previousByte, (byte) val};
+                
+                
+                // Line separator detection
+                if (new String(lineseparator).equals("\r\n")) {
+                    bytes.remove(previousByte);
+                    checksum -= previousByte;
+                    passwordRequest = true;
+                    break;
+                }                
+                
+                checksum += val;
+                bytes.add((byte) val);
+                // Debug purposes only
+                // Byte[] rawBytes0 = bytes.toArray(new Byte[bytes.size()]);
+                // String keyword0 = new String(ArrayUtils.toPrimitive(rawBytes0));   
+                previousByte = (byte) val;
+            }
+            Byte[] rawBytes = bytes.toArray(new Byte[bytes.size()]);
+            String keyword = new String(ArrayUtils.toPrimitive(rawBytes));            
+            RequestOffset data = new RequestOffset(keyword, checksum, previousByte);
+            if(passwordRequest) return rf.getPasswordRequest(data);
+                else return rf.parseRequest(keyword.split("\\s")[0], data);                        
+            
+        } catch (SocketTimeoutException ex){
+            throw ex;
+            
+        } catch (IOException ex) {
+            Logger.getLogger(Session.class.getName()).log(Level.SEVERE, null, ex);
+            throw new SessionRunException("Cannot read from input stream.", ex);
+        }
     }
 
     /**
@@ -194,14 +231,14 @@ public class Session extends Thread implements Serializable{
     }
     
     /**
-     * Generates session name as a MD5 hash of Session.established, Session.socket.localPort
+     * Generates session name as a MD5 hash of Session.established, Session.socket.port and some random number
      * @return hashed String
      */
     private String generateName(){
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
             Random randomizer = new Random();
-            md.update(("Session " + socket.getLocalPort() + " " + established + randomizer.nextInt()).getBytes());
+            md.update(("Session " + socket.getPort() + " " + established + randomizer.nextInt()).getBytes());
             byte[] digest = md.digest();
             return Base64.getEncoder().encodeToString(digest).toUpperCase();
         } catch (NoSuchAlgorithmException ex) {
@@ -241,9 +278,9 @@ public class Session extends Thread implements Serializable{
      * @throws BadChecksumException when the photo is not complete
      */
     public void addPhoto(Photo photo) throws BadChecksumException{
-        if(photo.validateChecksum()){
+        if(photo.validate()){
             LOG.log(Level.INFO, "Session {0}: Photo {1} uploaded.", new Object[]{this, photo});
-            //photos.add(photo);
+            //photos.add(photo); Not used for the current implementation.
         } else {
             throw new BadChecksumException("Incomplete transfer for photo " + photo);
         }

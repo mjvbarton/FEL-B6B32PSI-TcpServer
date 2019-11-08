@@ -1,16 +1,16 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package cz.cvut.fel.psi.tcpserver.exceptions;
 
 /**
- *
- * @author Matej
+ * Severe exception occured during session runtime.
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 public class SessionRunException extends Exception {
     
+    /**
+     * Creates new {@code SessionRunException} with error message and cause specified.
+     * @param message error message
+     * @param cause the cause of {@code SessionRunException}
+     */
     public SessionRunException(String message, Throwable cause) {
         super(message, cause);
     }

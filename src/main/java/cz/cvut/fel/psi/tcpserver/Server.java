@@ -11,11 +11,11 @@ import java.util.logging.Logger;
 
 /**
  * Represents a session manager of the server.
- * @author Matej
+ * @author Matej Barton (bartom47@fel.cvut.cz}
  */
 public class Server {
     public static final Logger LOG = Logger.getLogger(Server.class.getName());
-    public static final int SESSION_TIMEOUT_SECONDS = 45;
+    public static final int SESSION_TIMEOUT_SECONDS = 0;
     
     public static final String FILE_STORAGE_PATH = "";
     public static final int DEFAULT_PORT_NUMBER = 3999;
@@ -23,6 +23,11 @@ public class Server {
     private final int serverPort;
     private ServerSocket srvSocket;
 
+    /**
+     * Creates new server
+     * @param serverPort port where the server listens as {@code int}
+     * @throws cz.cvut.fel.psi.tcpserver.exceptions.ServerRunException when the process fails
+     */
     public Server(int serverPort) throws ServerRunException {
         this.serverPort = serverPort;
         try {
@@ -73,6 +78,7 @@ public class Server {
     
     /**
      * Creates new session at the server.
+     * @throws java.io.IOException when the process fails
      */
     public void acceptSession() throws IOException{
         Socket socket = srvSocket.accept();
