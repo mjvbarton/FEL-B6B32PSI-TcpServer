@@ -24,9 +24,9 @@ public class PhotoRequest extends Request<Photo> {
         int size = getSize(in);                
         byte[] photo = in.readNBytes(size);
         byte[] rawChecksum = in.readNBytes(4);
-        int validChecksum = getValidChecksum(rawChecksum);
+        int validChecksum = getValidChecksum(rawChecksum);        
         data = new Photo(size, photo, validChecksum);            
-        in.readNBytes(2); // TODO: Consider removing this when Baryk testing fails.
+        //in.skipNBytes(2); // TODO: Consider removing this when Baryk testing fails.
     }      
     
     /*

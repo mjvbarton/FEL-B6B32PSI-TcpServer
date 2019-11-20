@@ -31,6 +31,9 @@ public class AcceptingUsername extends Response{
         try {
             try{
                 Request req = session.acceptRequest();
+                if(!(req instanceof UsernameRequest)){
+                    throw new RequestSyntaxException("Wrong request for accept.");
+                }
                 UsernameRequest urq = (UsernameRequest) req;                
                 session.setUser(urq.getData());                 
                 Response next = new AcceptingPassword(session);

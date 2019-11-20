@@ -49,6 +49,9 @@ public class AcceptingPassword extends Response{
     public Response next() throws SessionClosedException{
         try {
             Request req = session.acceptRequest();
+            if(!(req instanceof PasswordRequest)){
+                throw new RequestSyntaxException("Invalid request.");
+            }
             PasswordRequest prq = (PasswordRequest) req;
             if(validateUser(req)){
                 Response next = new AcceptingMessages(session);

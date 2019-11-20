@@ -19,9 +19,13 @@ public class Server {
     
     public static final String FILE_STORAGE_PATH = "";
     public static final int DEFAULT_PORT_NUMBER = 3999;
+    
+    private static boolean isRunning = true;
 
     private final int serverPort;
     private ServerSocket srvSocket;
+    
+    public static Server srv;
 
     /**
      * Creates new server
@@ -45,7 +49,7 @@ public class Server {
      */
     public static void main(String[] args) throws ServerRunException {
         Logger rootLogger = Logger.getLogger("");
-        rootLogger.setLevel(Level.FINEST);
+        rootLogger.setLevel(Level.INFO);
         for(Handler h : rootLogger.getHandlers()){
             h.setLevel(Level.FINEST);
         }
@@ -63,9 +67,9 @@ public class Server {
             port = DEFAULT_PORT_NUMBER;
         }
         
-        Server srv = new Server(port);
+        srv = new Server(port);
         LOG.log(Level.INFO, "Started server at port {0}", port);
-        while(true){
+        while(isRunning){
             try {
                 srv.acceptSession();
             } catch (IOException ex) {
@@ -74,6 +78,11 @@ public class Server {
             }
         }
         
+    }
+    
+    public void close() throws IOException{
+        isRunning = false;
+        srvSocket.close();
     }
     
     /**
