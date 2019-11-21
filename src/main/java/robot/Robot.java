@@ -62,8 +62,13 @@ public class Robot {
         try {
             final ServerSocket serverSocket = new ServerSocket(serverPort);
             isRunning = true;
+            LOG.log(Level.INFO, "Started server at port {0}", serverPort);
+            
             while (isRunning) {
-                
+                Session session = new Session(serverSocket.accept());                
+                Thread thread = new Thread(session);
+                thread.start();
+                LOG.log(Level.FINE, "Started new session");
             }
         } catch (IOException iOException) {
             LOG.log(Level.SEVERE, "Exception {0} occured while running the server.", iOException);
@@ -73,6 +78,7 @@ public class Robot {
 
     public static void stop(){        
         isRunning = false;
+        LOG.log(Level.INFO, "Server stopped from the runtime.");
     }
 }
 
@@ -101,11 +107,12 @@ class Session implements Runnable{
             while (true) {
                 out.write(state.getMessage().getBytes());
                 LOG.log(Level.FINE, "Session {0} sent response: {1}", new Object[]{this, state.getMessage()});
-                try {
-                    Request req = acceptRequest();
-                    LOG.log(Level.FINE, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
+                Request req;
+                try {                    
                     switch (state) {
                         case ACCEPTING_USERNAME:
+                            req = acceptRequest();
+                            LOG.log(Level.FINE, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
                             String username = parseRequestData(req.getData());                            
                             user = new User(username);
                             state = State.ACCEPTING_PASSWORD;
@@ -113,6 +120,8 @@ class Session implements Runnable{
                             break;
                         
                         case ACCEPTING_PASSWORD:
+                            req = acceptRequest();
+                            LOG.log(Level.FINE, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
                             String password = parseRequestData(req.getData());
                             try {
                                 int passcode = Integer.parseInt(password);
@@ -130,8 +139,10 @@ class Session implements Runnable{
                         
                         case BAD_CHECKSUM:
                         case ACCEPTING_MESSAGES:
+                            req = acceptRequest();
                             switch (req.getRequestType()) {
                                 case INFO:
+                                    state = State.ACCEPTING_MESSAGES;
                                     LOG.log(Level.INFO, "Session {0} accepted info message: {1}", new Object[]{this, new String(req.getData())});
                                     break;
                                 
@@ -195,7 +206,8 @@ class Session implements Runnable{
     
     private String parseRequestData(byte[] rawData){
         String data = new String(rawData);
-        return data.split("\r\n")[0];
+        String[] list = data.split("\r\n");
+        return list.length == 0 ? "" : list[0];
     }
     
     public Request acceptRequest() throws SyntaxErrorException, SessionClosedException, SocketTimeoutException{
@@ -297,10 +309,11 @@ class Session implements Runnable{
                 return RequestType.PASSWORD;
             
             case ACCEPTING_MESSAGES:
+            case BAD_CHECKSUM:
                 return RequestType.INFO;
             
             default:
-                throw new IllegalStateException("No request type for this state.");
+                throw new IllegalStateException("No request type for this state " + state);
         }
     }
     
@@ -313,7 +326,7 @@ enum State{
     BAD_CHECKSUM(300, "bad checksum", false),
     LOGIN_FAILED(500, "login failed", true),
     SYNTAX_ERROR(501, "syntax error", true),
-    TIMEOUT(502, "timeout", false);
+    TIMEOUT(502, "timeout", true);
     
     private final int code;
     private final String message;
@@ -330,7 +343,7 @@ enum State{
     }
 
     public String getMessage() {
-        return String.format("%s %s%s", code, message, Robot.LINE_SEPARATOR);
+        return String.format("%s %s%s", code, message.toUpperCase(), Robot.LINE_SEPARATOR);
     }
 
     public boolean isFinalState() {
