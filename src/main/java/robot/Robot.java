@@ -2,18 +2,24 @@ package robot;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.logging.Handler;
 import java.util.logging.Level;
+import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.commons.lang.ArrayUtils;
+//import org.apache.commons.lang.ArrayUtils;
 
 /**
  *
@@ -37,6 +43,14 @@ public class Robot {
      *   
      */
     public static void main(String[] args){
+       
+        // Logger settings
+        Logger rootLogger = LogManager.getLogManager().getLogger("");
+        rootLogger.setLevel(Level.FINEST);
+        for (Handler h : rootLogger.getHandlers()) {
+            h.setLevel(Level.FINEST);
+        }
+        
         int serverPort;
         if(args.length >= 1){            
             serverPort = Integer.parseInt(args[0]);
@@ -85,7 +99,8 @@ public class Robot {
 class Session implements Runnable{
     private static Logger LOG = Logger.getLogger(Session.class.getName());
     private Socket socket;
-    private BufferedInputStream in;
+    //private BufferedInputStream in;
+    private InputStream in;
     private OutputStream out;
     private State state;
     private User user;
@@ -94,7 +109,8 @@ class Session implements Runnable{
     public Session(Socket socket) throws IOException{
         state = State.ACCEPTING_USERNAME;
         this.socket = socket;
-        in = new BufferedInputStream(socket.getInputStream());
+        in = socket.getInputStream();
+        //in = new BufferedInputStream(socket.getInputStream());
         out = socket.getOutputStream();
         this.socket.setSoTimeout(Robot.TIMEOUT_SECONDS * 1000);
         isRunning = true;
@@ -190,12 +206,16 @@ class Session implements Runnable{
             
         } catch (SessionClosedException sessionClosedException) {
             try {
+                Thread.sleep(100);
                 socket.close();
                 LOG.log(Level.INFO, "Session {0} closed at port {1}", new Object[]{this, socket.getPort()});
                 
             } catch (IOException iOException) {
-                LOG.log(Level.SEVERE, "Session {0} cannot close the socket due to {1}", new Object[] {this, iOException});
+                LOG.log(Level.SEVERE, "Session {0} cannot close the socket due to {1}", new Object[] {this, iOException});                
                 throw new RuntimeException("Server error. Cannot close the socket.", iOException);        
+                
+            } catch (InterruptedException ex) {
+                Logger.getLogger(Session.class.getName()).log(Level.SEVERE, null, ex);
             }
                         
         } catch (IllegalStateException illegalStateException) {
@@ -234,8 +254,11 @@ class Session implements Runnable{
                 
                 if (acceptingType == RequestType.INFO && rawMessage.size() <= 4) {
                     String keyword = new String(parseBytes(rawKeyword));
+                    if(!(RequestType.INFO.isValidKeywordPart(keyword) || RequestType.PHOTO.isValidKeywordPart(keyword)))
+                        throw new SyntaxErrorException("Invalid syntax.");
                     try {
                         acceptingType = RequestType.resolveMessageRequestType(keyword);
+                        
                     } catch (IllegalArgumentException e) {
                         if(rawMessage.size() == 4)
                             throw new SyntaxErrorException("Invalid syntax.", e);
@@ -259,14 +282,25 @@ class Session implements Runnable{
                 }                
                 
                 if (acceptingType == RequestType.PHOTO && photo != null) {
-                    byte[] rawPhoto = in.readNBytes(photo.getSize());
+                    //byte[] rawPhoto = in.readNBytes(photo.getSize());
+                    byte[] rawPhoto = new byte[photo.getSize()];                    
+                    for(int i = 0; i < photo.getSize(); i++){
+                        rawPhoto[i] = (byte) in.read();
+                    }
                     int checksum = 0;
                     for (byte b : rawPhoto) {
                         checksum += (int) b;
+                        rawMessage.add(b);
                     }
                     photo.setCountedChecksum(checksum);
                     
-                    byte[] rawChecksum = in.readNBytes(4);
+                    //byte[] rawChecksum = in.readNBytes(4);
+                    byte[] rawChecksum = new byte[4];
+                    for(int i = 0; i < 4; i++){
+                        int b = in.read();
+                        rawChecksum[i] = (byte) b;
+                        rawMessage.add((byte) b);
+                    }
                     
                     StringBuilder sb = new StringBuilder();
                     for (byte b : rawChecksum) {
@@ -295,7 +329,11 @@ class Session implements Runnable{
     
     private byte[] parseBytes(List<Byte> bytes){
         Byte[] rawBytes = bytes.toArray(new Byte[bytes.size()]);
-        return ArrayUtils.toPrimitive(rawBytes);        
+        byte[] returnBytes = new byte[rawBytes.length];
+        for(int i = 0; i < rawBytes.length; i++){
+            returnBytes[i] = (byte) rawBytes[i];
+        }
+        return returnBytes;
     }
     
     
@@ -392,6 +430,16 @@ enum RequestType{
     
     public Pattern getSyntax(){
         return syntax;
+    }
+    
+    public boolean isValidKeywordPart(String keywordPart){
+        if(keywordPart.length() > 4 || keywordPart.length() <= 0)
+            return false;
+        else{
+            Pattern pat = Pattern.compile(keyword.substring(0, keywordPart.length()));
+            return pat.matcher(keywordPart).matches();            
+        }
+
     }
 }
 
