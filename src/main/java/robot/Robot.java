@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -76,10 +77,12 @@ public class Robot {
 }
 
 class Session implements Runnable{
+    private static Logger LOG = Logger.getLogger(Session.class.getName());
     private Socket socket;
     private BufferedInputStream in;
     private OutputStream out;
     private State state;
+    private User user;
     private boolean isRunning;
     
     public Session(Socket socket) throws IOException{
@@ -87,15 +90,115 @@ class Session implements Runnable{
         this.socket = socket;
         in = new BufferedInputStream(socket.getInputStream());
         out = socket.getOutputStream();
+        this.socket.setSoTimeout(Robot.TIMEOUT_SECONDS * 1000);
         isRunning = true;
     }
     
     @Override
     public void run() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        LOG.log(Level.INFO, "Session {0} opened at socket {1}", new Object[]{this, socket.getPort()});
+        try {
+            while (true) {
+                out.write(state.getMessage().getBytes());
+                LOG.log(Level.FINE, "Session {0} sent response: {1}", new Object[]{this, state.getMessage()});
+                try {
+                    Request req = acceptRequest();
+                    LOG.log(Level.FINE, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
+                    switch (state) {
+                        case ACCEPTING_USERNAME:
+                            String username = parseRequestData(req.getData());                            
+                            user = new User(username);
+                            state = State.ACCEPTING_PASSWORD;
+                            LOG.log(Level.FINE, "Session {0} accepted username {1}.", new Object[]{this, username});
+                            break;
+                        
+                        case ACCEPTING_PASSWORD:
+                            String password = parseRequestData(req.getData());
+                            try {
+                                int passcode = Integer.parseInt(password);
+                                LOG.log(Level.FINE, "Session {0} accepted passcode {1}.", new Object[]{this, passcode});
+                                if (user.authenticate(passcode)) {
+                                    state = State.ACCEPTING_MESSAGES;
+                                    LOG.log(Level.INFO, "Session {0} authentication successful.", this);
+                                } else {
+                                    state = State.LOGIN_FAILED;
+                                }                                
+                            } catch (NumberFormatException ex) {
+                                state = State.LOGIN_FAILED;                                
+                            }
+                            break;
+                        
+                        case BAD_CHECKSUM:
+                        case ACCEPTING_MESSAGES:
+                            switch (req.getRequestType()) {
+                                case INFO:
+                                    LOG.log(Level.INFO, "Session {0} accepted info message: {1}", new Object[]{this, new String(req.getData())});
+                                    break;
+                                
+                                case PHOTO:
+                                    if (req instanceof Photo) {
+                                        LOG.log(Level.INFO, "Session {0} accepted photo message: {1}", new Object[]{this, new String(req.getData())});
+                                        Photo photo = (Photo) req;
+                                        if (photo.validate()) {
+                                            state = State.ACCEPTING_MESSAGES;
+                                        } else {
+                                            state = State.BAD_CHECKSUM;
+                                        }
+                                    } else {
+                                        state = State.SYNTAX_ERROR;
+                                    }
+                                    break;
+                                
+                                default:
+                                    state = State.SYNTAX_ERROR;
+                                
+                            }
+                            break;
+                        
+                        case LOGIN_FAILED:
+                        case SYNTAX_ERROR:                            
+                        case TIMEOUT:
+                            throw new SessionClosedException("Session closed because by the server.");
+
+                        // Safety reasons - if thrown something is terribly wrong
+                        default:
+                            throw new IllegalStateException("Illegal state of the state machine.");
+                    }
+                } catch (SyntaxErrorException syntaxErrorException) {                    
+                    state = State.SYNTAX_ERROR;                    
+                    LOG.log(Level.WARNING, "Session {0} catched Syntax Error.", this);
+                } catch (SocketTimeoutException socketTimeoutException){                    
+                    state = State.TIMEOUT;
+                    LOG.log(Level.WARNING, "Session {0} was timeouted.", this);
+                }              
+            
+            }
+        } catch (IOException iOException) {
+            LOG.log(Level.SEVERE, "Session {0} cannot write to socket due to {1}", new Object[] {this, iOException});
+            throw new RuntimeException("Server error. Cannot write to socket.", iOException);        
+            
+        } catch (SessionClosedException sessionClosedException) {
+            try {
+                socket.close();
+                LOG.log(Level.INFO, "Session {0} closed at port {1}", new Object[]{this, socket.getPort()});
+                
+            } catch (IOException iOException) {
+                LOG.log(Level.SEVERE, "Session {0} cannot close the socket due to {1}", new Object[] {this, iOException});
+                throw new RuntimeException("Server error. Cannot close the socket.", iOException);        
+            }
+                        
+        } catch (IllegalStateException illegalStateException) {
+            LOG.log(Level.SEVERE, "Illegal state of the Session.run().");
+            throw new RuntimeException("Illegal state of the Session.run()", illegalStateException);
+        }
     }
     
-    public Request acceptRequest() throws SyntaxErrorException, SessionClosedException{
+    private String parseRequestData(byte[] rawData){
+        String data = new String(rawData);
+        return data.split("\r\n")[0];
+    }
+    
+    public Request acceptRequest() throws SyntaxErrorException, SessionClosedException, SocketTimeoutException{
         final List<Byte> rawMessage = new ArrayList();
         final List<Byte> rawKeyword = new ArrayList();
         final byte[] separator = new byte[2];
@@ -167,6 +270,8 @@ class Session implements Runnable{
                 throw new SyntaxErrorException("Invalid syntax of request " + request);
             else
                 return request;
+        } catch (SocketTimeoutException socketTimeoutException){
+            throw socketTimeoutException;
             
         } catch (IOException iOException) {
             throw new SessionClosedException("Error while reading input stream of the session.", iOException);
@@ -318,6 +423,16 @@ class User{
         Objects.requireNonNull(passcode);
         this.username = username;
         this.passcode = passcode;
+    }
+    
+    public User(String username){
+        Objects.requireNonNull(username);
+        this.username = username;
+        int checksum = 0;
+        for(byte b : username.getBytes()){
+            checksum += (int) b;
+        }
+        this.passcode = checksum;
     }
     
     public boolean authenticate(int passcode){        
