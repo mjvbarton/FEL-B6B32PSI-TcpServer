@@ -100,42 +100,79 @@ class Session implements Runnable{
         final List<Byte> rawKeyword = new ArrayList();
         final byte[] separator = new byte[2];
         Request request;
-        RequestType acceptingType = getRequestType();
+        Photo photo = null;
+        int photoSeparatorHitCounter = 0;
+        RequestType acceptingType = getRequestType();        
         
-        while(true){
-            int value = in.read();
-            if(value < 0){
-                throw new SessionClosedException("Socket was closed by the client.");
-            }
-            
-            rawMessage.add((byte) value);
-            
-            if(acceptingType != RequestType.PHOTO){
-                separator[1] = (byte) value;
-                if(Robot.LINE_SEPARATOR.equals(new String(separator))){
-                    break;
+        try {
+            while (true) {
+                int value = in.read();
+                if (value < 0) {
+                    throw new SessionClosedException("Socket was closed by the client.");
                 }
-                separator[0] = separator[1];
-            }           
-                        
-            if(rawMessage.size() < 5){
-                rawKeyword.add((byte) value);
-            }
-            
-            if(acceptingType == RequestType.INFO && rawMessage.size() == 4){
-                String keyword = new String(parseBytes(rawKeyword));
-                try {
-                    acceptingType = RequestType.resolveMessageRequestType(keyword);
-                } catch (IllegalArgumentException e) {
-                    throw new SyntaxErrorException("Invalid syntax.", e);
-                }
-            }
-            
-            if(acceptingType == RequestType.PHOTO){
                 
+                rawMessage.add((byte) value);                                              
+                
+                if (rawMessage.size() < 5) {
+                    rawKeyword.add((byte) value);
+                }
+                
+                if (acceptingType == RequestType.INFO && rawMessage.size() <= 4) {
+                    String keyword = new String(parseBytes(rawKeyword));
+                    try {
+                        acceptingType = RequestType.resolveMessageRequestType(keyword);
+                    } catch (IllegalArgumentException e) {
+                        if(rawMessage.size() == 4)
+                            throw new SyntaxErrorException("Invalid syntax.", e);
+                    }
+                }
+                
+                if (acceptingType != RequestType.PHOTO) {
+                    separator[1] = (byte) value;
+                    if (Robot.LINE_SEPARATOR.equals(new String(separator))) {
+                        break;
+                    }
+                    separator[0] = separator[1];
+                }
+                
+                if (acceptingType == RequestType.PHOTO && photo == null) {
+                    String photoSeparator = new String(new byte[]{(byte) value});
+                    if (photoSeparator.matches("\\s")) {
+                        photoSeparatorHitCounter++;
+                        photo = photoSeparatorHitCounter == 2 ? new Photo(parseBytes(rawMessage)) : null;
+                    }
+                }                
+                
+                if (acceptingType == RequestType.PHOTO && photo != null) {
+                    byte[] rawPhoto = in.readNBytes(photo.getSize());
+                    int checksum = 0;
+                    for (byte b : rawPhoto) {
+                        checksum += (int) b;
+                    }
+                    photo.setCountedChecksum(checksum);
+                    
+                    byte[] rawChecksum = in.readNBytes(4);
+                    
+                    StringBuilder sb = new StringBuilder();
+                    for (byte b : rawChecksum) {
+                        sb.append(String.format("%02x", b));
+                    }
+                    photo.setExpectedChecksum(Integer.parseInt(sb.toString(), 16));                    
+                    return photo;
+                }
             }
-                                    
+            request = new Request(acceptingType);
+            request.setData(parseBytes(rawMessage));
+            if(!request.checkSyntax())
+                throw new SyntaxErrorException("Invalid syntax of request " + request);
+            else
+                return request;
             
+        } catch (IOException iOException) {
+            throw new SessionClosedException("Error while reading input stream of the session.", iOException);
+        
+        } catch (NumberFormatException numberFormatException) {
+            throw new SyntaxErrorException("Wrong number format of photo valid checksum.", numberFormatException);
         }
     }
     
@@ -145,7 +182,7 @@ class Session implements Runnable{
     }
     
     
-    private RequestType getRequestType(){
+    protected RequestType getRequestType(){
         Objects.requireNonNull(state);
         switch(state){
             case ACCEPTING_USERNAME:
@@ -221,7 +258,7 @@ enum RequestType{
     
     private RequestType(String keyword, String syntax, int byteLength){
         this.keyword = keyword;
-        this.syntax = Pattern.compile(syntax);
+        this.syntax = Pattern.compile(syntax, Pattern.DOTALL);
         this.byteLength = byteLength;
     }
     
@@ -242,14 +279,11 @@ enum RequestType{
 
 class Request{
     private byte[] data;
-    private final RequestType requestType;
-    private final int checksum;
+    private final RequestType requestType;    
 
-    public Request(RequestType requestType, int checksum) {        
-        Objects.requireNonNull(requestType);
-        Objects.requireNonNull(checksum);
-        this.requestType = requestType;
-        this.checksum = checksum;
+    public Request(RequestType requestType) {        
+        Objects.requireNonNull(requestType);        
+        this.requestType = requestType;        
     }
 
     public byte[] getData() {
@@ -262,10 +296,6 @@ class Request{
 
     public RequestType getRequestType() {
         return requestType;
-    }
-
-    public int getChecksum() {
-        return checksum;
     }
             
     public boolean checkSyntax(){
@@ -303,13 +333,25 @@ class User{
     }        
 }
 
-class Photo{
+final class Photo extends Request{
     private int expectedChecksum;
     private int countedChecksum;
     private final int size;
 
     public Photo(int size) {
+        super(RequestType.PHOTO);
         this.size = size;
+    }
+    
+    public Photo(byte[] data) throws SyntaxErrorException{
+        super(RequestType.PHOTO);
+        setData(data);
+        if(checkSyntax()){
+            String message = new String(data);
+            String rawSize = message.split("\\s")[1];
+            size = Integer.parseInt(rawSize);            
+        } else
+            throw new SyntaxErrorException("Invalid syntax of photo request.");        
     }
 
     public int getExpectedChecksum() {
@@ -331,6 +373,10 @@ class Photo{
     public boolean validate(){
         return countedChecksum == expectedChecksum;
     }
+
+    public int getSize() {
+        return size;
+    }        
 }
 
 class SessionClosedException extends Exception{
