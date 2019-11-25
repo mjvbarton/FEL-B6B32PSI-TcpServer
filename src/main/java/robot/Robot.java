@@ -289,7 +289,7 @@ class Session implements Runnable{
                     }
                     int checksum = 0;
                     for (byte b : rawPhoto) {
-                        checksum += (int) b;
+                        checksum += (byte) b;
                         rawMessage.add(b);
                     }
                     photo.setCountedChecksum(checksum);
@@ -491,7 +491,7 @@ class User{
         this.username = username;
         int checksum = 0;
         for(byte b : username.getBytes()){
-            checksum += (int) b;
+            checksum += (byte) b;
         }
         this.passcode = checksum;
     }
