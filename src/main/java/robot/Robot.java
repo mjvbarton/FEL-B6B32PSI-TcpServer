@@ -159,7 +159,7 @@ class Session implements Runnable{
                             switch (req.getRequestType()) {
                                 case INFO:
                                     state = State.ACCEPTING_MESSAGES;
-                                    LOG.log(Level.INFO, "Session {0} accepted info message: {1}", new Object[]{this, new String(req.getData())});
+                                    //LOG.log(Level.INFO, "Session {0} accepted info message: {1}", new Object[]{this, new String(req.getData())});
                                     break;
                                 
                                 case PHOTO:
@@ -300,15 +300,17 @@ class Session implements Runnable{
                 
                 if (acceptingType == RequestType.PHOTO && photo != null) {
                     //byte[] rawPhoto = in.readNBytes(photo.getSize());
-                    byte[] rawPhoto = new byte[photo.getSize()];                    
+                    int[] rawPhoto = new int[photo.getSize()];   
+                    LOG.log(Level.FINE, "Session {0} PHOTO message size: {1}", new Object[]{this, photo.getSize()});
                     for(int i = 0; i < photo.getSize(); i++){
-                        rawPhoto[i] = (byte) in.read();
+                        rawPhoto[i] = in.read();
                     }
                     int checksum = 0;
-                    for (byte b : rawPhoto) {
-                        checksum += (byte) b;
-                        rawMessage.add(b);
+                    for (int b : rawPhoto) {
+                        checksum += b;
+                        rawMessage.add((byte) b);
                     }
+                    LOG.log(Level.FINE, "Session {0} PHOTO message counted checksum: {1}", new Object[]{this, checksum});
                     photo.setCountedChecksum(checksum);
                     
                     //byte[] rawChecksum = in.readNBytes(4);
@@ -322,8 +324,10 @@ class Session implements Runnable{
                     StringBuilder sb = new StringBuilder();
                     for (byte b : rawChecksum) {
                         sb.append(String.format("%02x", b));
-                    }
-                    photo.setExpectedChecksum(Integer.parseInt(sb.toString(), 16));                    
+                    }                    
+                    int expectedChecksum = Integer.parseInt(sb.toString(), 16);
+                    LOG.log(Level.FINE, "Session {0} PHOTO message expected checksum: {1}", new Object[]{this, expectedChecksum});
+                    photo.setExpectedChecksum(expectedChecksum);                    
                     return photo;
                 }
             }
