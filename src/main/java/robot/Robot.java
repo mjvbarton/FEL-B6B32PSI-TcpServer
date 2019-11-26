@@ -524,8 +524,10 @@ final class Photo extends Request{
         setData(data);
         if(checkSyntax()){
             String message = new String(data);
-            String rawSize = message.split("\\s")[1];
+            String rawSize = message.split(" ")[1];
             size = Integer.parseInt(rawSize);
+            if(size <= 0)
+                throw new SyntaxErrorException("Invalid size of photo.");
         } else
             throw new SyntaxErrorException("Invalid syntax of photo request.");        
     }
