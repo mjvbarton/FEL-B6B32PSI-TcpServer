@@ -128,11 +128,11 @@ class Session implements Runnable{
                     switch (state) {
                         case ACCEPTING_USERNAME:
                             req = acceptRequest();
-                            LOG.log(Level.FINE, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
-                            String username = parseRequestData(req.getData());                            
-                            user = new User(username);
+                            //LOG.log(Level.FINE, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
+                            //String username = parseRequestData(req.getData());                            
+                            user = new User(req.getIsValid(), req.getChecksum());
                             state = State.ACCEPTING_PASSWORD;
-                            LOG.log(Level.FINE, "Session {0} accepted username {1}.", new Object[]{this, username});
+                            //LOG.log(Level.FINE, "Session {0} accepted username {1}.", new Object[]{this, username});
                             break;
                         
                         case ACCEPTING_PASSWORD:
@@ -191,9 +191,10 @@ class Session implements Runnable{
                         default:
                             throw new IllegalStateException("Illegal state of the state machine.");
                     }
-                } catch (SyntaxErrorException syntaxErrorException) {                    
+                } catch (SyntaxErrorException syntaxErrorException) {     
                     state = State.SYNTAX_ERROR;                    
                     LOG.log(Level.WARNING, "Session {0} catched Syntax Error.", this);
+                    
                 } catch (SocketTimeoutException socketTimeoutException){                    
                     state = State.TIMEOUT;
                     LOG.log(Level.WARNING, "Session {0} was timeouted.", this);
@@ -231,26 +232,31 @@ class Session implements Runnable{
     }
     
     public Request acceptRequest() throws SyntaxErrorException, SessionClosedException, SocketTimeoutException{
-        final List<Byte> rawMessage = new ArrayList();
+        List<Byte> rawMessage = new ArrayList();
         final List<Byte> rawKeyword = new ArrayList();
         final byte[] separator = new byte[2];
         Request request;
         Photo photo = null;
         int photoSeparatorHitCounter = 0;
-        RequestType acceptingType = getRequestType();        
+        RequestType acceptingType = getRequestType();
+        int checksm = 0;
+        Boolean validationFlag = null;
         
         try {
             while (true) {
                 int value = in.read();
+                checksm += value;
+                
                 if (value < 0) {
                     throw new SessionClosedException("Socket was closed by the client.");
                 }
                 
                 rawMessage.add((byte) value);                                              
                 
-                if (rawMessage.size() < 5) {
+                if (rawMessage.size() <= 5) {
                     rawKeyword.add((byte) value);
                 }
+                            
                 
                 if (acceptingType == RequestType.INFO && rawMessage.size() <= 4) {
                     String keyword = new String(parseBytes(rawKeyword));
@@ -265,9 +271,20 @@ class Session implements Runnable{
                     }
                 }
                 
+                if (acceptingType == RequestType.USERNAME && rawMessage.size() <= 5) {
+                    String keyword = new String(parseBytes(rawKeyword));
+                    if (!RequestType.USERNAME.isValidKeywordPart(keyword)) {
+                        validationFlag = false;
+                    }
+                    if (rawMessage.size() == 5 && keyword.equals(RequestType.USERNAME.keyword())) {
+                        validationFlag = true;
+                    }
+                }
+                
                 if (acceptingType != RequestType.PHOTO) {
                     separator[1] = (byte) value;
                     if (Robot.LINE_SEPARATOR.equals(new String(separator))) {
+                        checksm -= 23;
                         break;
                     }
                     separator[0] = separator[1];
@@ -311,6 +328,9 @@ class Session implements Runnable{
                 }
             }
             request = new Request(acceptingType);
+            request.setChecksum(checksm);
+            request.setIsValid(validationFlag);
+            LOG.log(Level.FINE, "Session {0} checksum of message {1} is: {2}", new Object[]{this, acceptingType, checksm});
             request.setData(parseBytes(rawMessage));
             if(!request.checkSyntax())
                 throw new SyntaxErrorException("Invalid syntax of request " + request);
@@ -390,7 +410,7 @@ enum State{
 }
 
 enum RequestType{
-    USERNAME,
+    USERNAME("Robot"),
     PASSWORD,
     INFO("INFO", "^INFO .+"), 
     PHOTO("FOTO", "^FOTO \\d+ ");
@@ -432,6 +452,10 @@ enum RequestType{
         return syntax;
     }
     
+    public String keyword(){
+        return keyword;
+    }
+    
     public boolean isValidKeywordPart(String keywordPart){
         if(keywordPart.length() > 4 || keywordPart.length() <= 0)
             return false;
@@ -445,6 +469,8 @@ enum RequestType{
 
 class Request{
     private byte[] data;
+    private int checksum;
+    private Boolean isValid;
     private final RequestType requestType;    
 
     public Request(RequestType requestType) {        
@@ -456,6 +482,22 @@ class Request{
         return data;
     }
 
+    public int getChecksum() {
+        return checksum;
+    }
+
+    public void setChecksum(int checksum) {
+        this.checksum = checksum;
+    }
+
+    public Boolean getIsValid() {
+        return isValid;
+    }
+
+    public void setIsValid(Boolean isValid) {
+        this.isValid = isValid;
+    }
+                
     public void setData(byte[] data) {
         this.data = data;
     }
@@ -474,26 +516,27 @@ class Request{
 }
 
 class User{
-    private final String username;
+    private final boolean isValidUsername;
     private final int passcode;
     
     private final Pattern pat = Pattern.compile("^Robot.*");
 
-    public User(String username, int passcode) {
-        Objects.requireNonNull(username);
-        Objects.requireNonNull(passcode);
-        this.username = username;
-        this.passcode = passcode;
-    }
+//    public User(String username, int passcode) {
+//        Objects.requireNonNull(username);
+//        Objects.requireNonNull(passcode);
+//        this.username = username;
+//        this.passcode = passcode;
+//    }
     
-    public User(String username){
-        Objects.requireNonNull(username);
-        this.username = username;
-        int checksum = 0;
-        for(byte b : username.getBytes()){
-            checksum += (byte) b;
-        }
-        this.passcode = checksum;
+    public User(Boolean isValidUsername, int passcode){
+        Objects.requireNonNull(isValidUsername);
+        this.isValidUsername = isValidUsername;
+//        int checksum = 0;
+//        for(byte b : username.getBytes()){
+//            checksum += (byte) b;
+//        }
+//        this.passcode = checksum;
+        this.passcode = passcode;
     }
     
     public boolean authenticate(int passcode){        
@@ -501,11 +544,11 @@ class User{
         boolean validUsername;
         boolean validPassword;
         
-        final Matcher m = pat.matcher(username);
-        validUsername = m.matches();
+        //final Matcher m = pat.matcher(username);
+        //validUsername = m.matches();
         validPassword = passcode == this.passcode;
         
-        return validUsername && validPassword;                
+        return isValidUsername && validPassword;                
     }        
 }
 
