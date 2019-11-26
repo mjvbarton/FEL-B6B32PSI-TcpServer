@@ -287,7 +287,7 @@ class Session implements Runnable{
      * @throws SessionClosedException if the session is closed by the client
      * @throws SocketTimeoutException if the timeout expires
      */
-    public Request acceptRequest() throws SyntaxErrorException, SessionClosedException, SocketTimeoutException{
+    protected Request acceptRequest() throws SyntaxErrorException, SessionClosedException, SocketTimeoutException{
         List<Byte> rawMessage = new ArrayList();
         final List<Byte> rawKeyword = new ArrayList();
         final byte[] separator = new byte[2];
