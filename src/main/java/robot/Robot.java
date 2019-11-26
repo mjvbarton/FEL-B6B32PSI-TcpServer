@@ -46,22 +46,22 @@ public class Robot {
        
         // Logger settings
         Logger rootLogger = LogManager.getLogManager().getLogger("");
-        rootLogger.setLevel(Level.FINEST);
+        rootLogger.setLevel(Level.FINE);
         for (Handler h : rootLogger.getHandlers()) {
-            h.setLevel(Level.FINEST);
+            h.setLevel(Level.FINE);
         }
         
         int serverPort;
         if(args.length >= 1){            
             serverPort = Integer.parseInt(args[0]);
-            LOG.log(Level.FINE, "Initialized server with server port {0}", serverPort);
+            LOG.log(Level.FINEST, "Initialized server with server port {0}", serverPort);
             if(args.length == 2){
                 TIMEOUT_SECONDS = Integer.parseInt(args[1]);
                 if(TIMEOUT_SECONDS < 0){
                     LOG.log(Level.SEVERE, "Invalid argument. Timeout must be greater or equal to zero");
                     throw new IllegalArgumentException("Argument must be greater than or equal to zero");
                 }
-                LOG.log(Level.FINE, "Used custom timeout for sessions of {0} seconds.", TIMEOUT_SECONDS);
+                LOG.log(Level.FINEST, "Used custom timeout for sessions of {0} seconds.", TIMEOUT_SECONDS);
             }
             
             if(args.length > 2){
@@ -70,7 +70,7 @@ public class Robot {
             }
         } else {
             serverPort = DEFAULT_PORT;
-            LOG.log(Level.FINE, "Initialized server with default server port and default timeout.");
+            LOG.log(Level.FINEST, "Initialized server with default server port and default timeout.");
         }
         
         try {
@@ -82,7 +82,7 @@ public class Robot {
                 Session session = new Session(serverSocket.accept());                
                 Thread thread = new Thread(session);
                 thread.start();
-                LOG.log(Level.FINE, "Started new session");
+                LOG.log(Level.FINEST, "Started new session");
             }
         } catch (IOException iOException) {
             LOG.log(Level.SEVERE, "Exception {0} occured while running the server.", iOException);
@@ -122,7 +122,7 @@ class Session implements Runnable{
         try {
             while (true) {
                 out.write(state.getMessage().getBytes());
-                LOG.log(Level.FINE, "Session {0} sent response: {1}", new Object[]{this, state.getMessage()});
+                LOG.log(Level.FINEST, "Session {0} sent response: {1}", new Object[]{this, state.getMessage()});
                 Request req;
                 try {                    
                     switch (state) {
@@ -137,11 +137,11 @@ class Session implements Runnable{
                         
                         case ACCEPTING_PASSWORD:
                             req = acceptRequest();
-                            LOG.log(Level.FINE, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
+                            LOG.log(Level.FINEST, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
                             String password = parseRequestData(req.getData());
                             try {
                                 int passcode = Integer.parseInt(password);
-                                LOG.log(Level.FINE, "Session {0} accepted passcode {1}.", new Object[]{this, passcode});
+                                LOG.log(Level.FINEST, "Session {0} accepted passcode {1}.", new Object[]{this, passcode});
                                 if (user.authenticate(passcode)) {
                                     state = State.ACCEPTING_MESSAGES;
                                     LOG.log(Level.INFO, "Session {0} authentication successful.", this);
@@ -164,7 +164,7 @@ class Session implements Runnable{
                                 
                                 case PHOTO:
                                     if (req instanceof Photo) {
-                                        LOG.log(Level.INFO, "Session {0} accepted photo message: {1}", new Object[]{this, new String(req.getData())});
+                                        LOG.log(Level.FINEST, "Session {0} accepted photo message: {1}", new Object[]{this, new String(req.getData())});
                                         Photo photo = (Photo) req;
                                         if (photo.validate()) {
                                             state = State.ACCEPTING_MESSAGES;
@@ -241,6 +241,7 @@ class Session implements Runnable{
         RequestType acceptingType = getRequestType();
         int checksm = 0;
         Boolean validationFlag = null;
+        LOG.log(Level.FINE, "Session {0}: Started process of accepting new Request.", this);
         
         try {
             while (true) {
@@ -260,14 +261,20 @@ class Session implements Runnable{
                 
                 if (acceptingType == RequestType.INFO && rawMessage.size() <= 4) {
                     String keyword = new String(parseBytes(rawKeyword));
+                    LOG.log(Level.FINE, "Session {0} captured keyword part: {1}", new Object[]{this, keyword});
                     if(!(RequestType.INFO.isValidKeywordPart(keyword) || RequestType.PHOTO.isValidKeywordPart(keyword)))
                         throw new SyntaxErrorException("Invalid syntax.");
                     try {
                         acceptingType = RequestType.resolveMessageRequestType(keyword);
+                        if(acceptingType == RequestType.PHOTO)
+                            continue;
+                        LOG.log(Level.FINE, "Session {0} changed its accepting type to {1}", new Object[]{this, acceptingType});
                         
                     } catch (IllegalArgumentException e) {
                         if(rawMessage.size() == 4)
                             throw new SyntaxErrorException("Invalid syntax.", e);
+                        else
+                            LOG.log(Level.SEVERE, "Uncaught exception !!!");
                     }
                 }
                 
@@ -291,11 +298,15 @@ class Session implements Runnable{
                 }
                 
                 if (acceptingType == RequestType.PHOTO && photo == null) {
+                    LOG.log(Level.FINE, "Session {0} actually captured PHOTO message: {1}", new Object[]{this, new String(parseBytes(rawMessage))});
                     String photoSeparator = new String(new byte[]{(byte) value});
                     if (photoSeparator.matches("\\s")) {
                         photoSeparatorHitCounter++;
                         photo = photoSeparatorHitCounter == 2 ? new Photo(parseBytes(rawMessage)) : null;
+                    } else if(!photoSeparator.matches("\\d") && photoSeparatorHitCounter >= 1){
+                        throw new SyntaxErrorException("Invalid photo syntax.");                        
                     }
+                    
                 }                
                 
                 if (acceptingType == RequestType.PHOTO && photo != null) {
