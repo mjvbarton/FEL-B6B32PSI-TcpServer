@@ -118,8 +118,7 @@ public class Robot {
  */
 class Session implements Runnable{
     private static Logger LOG = Logger.getLogger(Session.class.getName());
-    private Socket socket;
-    //private BufferedInputStream in;
+    private Socket socket;    
     private InputStream in;
     private OutputStream out;
     private State state;
@@ -134,8 +133,7 @@ class Session implements Runnable{
     public Session(Socket socket) throws IOException{
         state = State.ACCEPTING_USERNAME;
         this.socket = socket;
-        in = socket.getInputStream();
-        //in = new BufferedInputStream(socket.getInputStream());
+        in = socket.getInputStream();        
         out = socket.getOutputStream();
         this.socket.setSoTimeout(Robot.TIMEOUT_SECONDS * 1000);
         isRunning = true;
@@ -156,11 +154,11 @@ class Session implements Runnable{
                         */
                         case ACCEPTING_USERNAME:
                             req = acceptRequest();
-                            //LOG.log(Level.FINE, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
-                            //String username = parseRequestData(req.getData());                            
+                            LOG.log(Level.FINE, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
+                            String username = parseRequestData(req.getData());                            
                             user = new User(req.getIsValid(), req.getChecksum());
                             state = State.ACCEPTING_PASSWORD;
-                            //LOG.log(Level.FINE, "Session {0} accepted username {1}.", new Object[]{this, username});
+                            LOG.log(Level.FINE, "Session {0} accepted username {1}.", new Object[]{this, username});
                             break;
                         
                         /*
