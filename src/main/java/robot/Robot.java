@@ -1,899 +1,869 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package robot;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Serializable;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-//import java.util.Base64;
-import java.util.Date;
-import java.util.InputMismatchException;
 import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Random;
-import java.util.Scanner;
+import java.util.Objects;
 import java.util.logging.Handler;
 import java.util.logging.Level;
+import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+//import org.apache.commons.lang.ArrayUtils; -- unused due to old Java version being used at Baryk server
 
 /**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
+ * Represents the server.
+ * 
+ * @author Matej Barton (bartom47@fel.cvut.cz)
  */
 public class Robot {
-
     /**
-     * @param args the command line arguments
+     * Line separator specification.
      */
-    public static void main(String[] args) throws ServerRunException {
-        // TODO code application logic here
-        Server.main(args);
-    }
+    public static final String LINE_SEPARATOR = "\r\n";
     
-}
-
-/**
- * Represents a session manager of the server.
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class Server {
-
-    public static final Logger LOG = Logger.getLogger(Server.class.getName());
-    public static final int SESSION_TIMEOUT_SECONDS = 45;
-
-    public static final String FILE_STORAGE_PATH = "";
-    public static final int DEFAULT_PORT_NUMBER = 3999;
-
-    private final int serverPort;
-    private ServerSocket srvSocket;
-
-    public Server(int serverPort) throws ServerRunException {
-        this.serverPort = serverPort;
-        try {
-            srvSocket = new ServerSocket(serverPort);
-        } catch (IOException ex) {
-            Logger.getLogger(Server.class.getName()).log(Level.SEVERE, "Unable to start server.");
-            throw new ServerRunException("Unable to start server", ex);
-        }
-    }
+    /**
+     * Default port specification. Default value should be {@code 3999}.
+     */
+    public static final int DEFAULT_PORT = 3999;
+    
+    /**
+     * Default timeout in seconds.
+     */
+    public static final int DEFAULT_TIMEOUT_SECONDS = 45;
+    
+    /**
+     * Actual timeout in seconds set by the server startup.
+     */
+    public static int TIMEOUT_SECONDS = DEFAULT_TIMEOUT_SECONDS;
+    
+    /**
+     * Running flag for testing purposes.
+     */
+    private static boolean isRunning;
+        
+    private static final Logger LOG = Logger.getLogger(Robot.class.getName());
 
     /**
-     * Runs the program.
-     *
-     * @param args the command line arguments
-     * @throws cz.cvut.fel.psi.tcpserver.exceptions.ServerRunException if the
-     * process fails
+     * @param args the command line arguments {@code <serverPortNumber> <timeout>}     
+     *   
      */
-    public static void main(String[] args) throws ServerRunException {
-        Logger rootLogger = Logger.getLogger("");
+    public static void main(String[] args){
+       
+        // Logger settings
+        Logger rootLogger = LogManager.getLogManager().getLogger("");
         rootLogger.setLevel(Level.INFO);
         for (Handler h : rootLogger.getHandlers()) {
             h.setLevel(Level.INFO);
         }
-        int port;
-        if (args.length > 0) {
-            try {
-                port = Integer.parseInt(args[0]);
-                if (port < 1024) {
-                    throw new ServerRunException("Please enter port number higher than 1024.");
+        
+        int serverPort;
+        if(args.length >= 1){            
+            serverPort = Integer.parseInt(args[0]);
+            LOG.log(Level.FINEST, "Initialized server with server port {0}", serverPort);
+            if(args.length == 2){
+                TIMEOUT_SECONDS = Integer.parseInt(args[1]);
+                if(TIMEOUT_SECONDS < 0){
+                    LOG.log(Level.SEVERE, "Invalid argument. Timeout must be greater or equal to zero");
+                    throw new IllegalArgumentException("Argument must be greater than or equal to zero");
                 }
-            } catch (NumberFormatException ex) {
-                throw new ServerRunException("Please enter valid port number.", ex);
+                LOG.log(Level.FINEST, "Used custom timeout for sessions of {0} seconds.", TIMEOUT_SECONDS);
+            }
+            
+            if(args.length > 2){
+                LOG.log(Level.SEVERE, "Invalid arguments for the server found.");
+                throw new IllegalArgumentException("Invalid argument captured");
             }
         } else {
-            port = DEFAULT_PORT_NUMBER;
+            serverPort = DEFAULT_PORT;
+            LOG.log(Level.FINEST, "Initialized server with default server port and default timeout.");
         }
-
-        Server srv = new Server(port);
-        LOG.log(Level.INFO, "Started server at port {0}", port);
-        while (true) {
-            try {
-                srv.acceptSession();
-            } catch (IOException ex) {
-                LOG.log(Level.SEVERE, "Cannot read or write to server socket.", ex);
-                throw new ServerRunException("Cannot accept session.", ex);
+        
+        try {
+            final ServerSocket serverSocket = new ServerSocket(serverPort);
+            isRunning = true;
+            LOG.log(Level.INFO, "Started server at port {0}", serverPort);
+            
+            while (isRunning) {
+                Session session = new Session(serverSocket.accept());                
+                Thread thread = new Thread(session);
+                thread.start();
+                LOG.log(Level.FINEST, "Started new session");
             }
+        } catch (IOException iOException) {
+            LOG.log(Level.SEVERE, "Exception {0} occured while running the server.", iOException);
+            throw new RuntimeException("Error while running the server", iOException);
         }
-
     }
 
     /**
-     * Creates new session at the server.
+     * Stop method of the server. Used only for testing purposes.
      */
-    public void acceptSession() throws IOException {
-        Socket socket = srvSocket.accept();
-        Session session = new Session(socket, this);
-        session.start();
-    }
-
-    /**
-     * Saves photos given at the server.
-     *
-     * @param photos list of photos to be saved at the server
-     * @throws cz.cvut.fel.psi.tcpserver.exceptions.ServerRunException
-     */
-    public synchronized void savePhotos(List<Photo> photos) throws ServerRunException {
-        throw new UnsupportedOperationException("Method not implemented yet. Needed to be consulted.");
+    public static void stop(){        
+        isRunning = false;
+        LOG.log(Level.INFO, "Server stopped from the runtime.");
     }
 }
 
 /**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
+ * Represents the client's session.
+ * 
+ * @author Matej Barton (bartom47@fel.cvut.cz)
  */
-class Photo {
+class Session implements Runnable{
+    private static Logger LOG = Logger.getLogger(Session.class.getName());
+    private Socket socket;    
+    private InputStream in;
+    private OutputStream out;
+    private State state;
+    private User user;
+    private boolean isRunning;
+    
+    /**
+     * Creates new {@code Session} with socket given by the server.
+     * @param socket socket given to session by the server     
+     * @throws IOException if the instance is not able to read/write from/to the socket
+     */
+    public Session(Socket socket) throws IOException{
+        state = State.ACCEPTING_USERNAME;
+        this.socket = socket;
+        in = socket.getInputStream();        
+        out = socket.getOutputStream();
+        this.socket.setSoTimeout(Robot.TIMEOUT_SECONDS * 1000);
+        isRunning = true;
+    }
+    
+    @Override
+    public void run() {
+        LOG.log(Level.INFO, "Session {0} opened at socket {1}", new Object[]{this, socket.getPort()});
+        try {
+            while (true) {
+                out.write(state.getMessage().getBytes());
+                LOG.log(Level.FINEST, "Session {0} sent response: {1}", new Object[]{this, state.getMessage()});
+                Request req;
+                try {                    
+                    switch (state) {
+                        /*
+                        * Processing username message from the client
+                        */
+                        case ACCEPTING_USERNAME:
+                            req = acceptRequest();
+                            LOG.log(Level.FINE, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
+                            String username = parseRequestData(req.getData());                            
+                            user = new User(req.getIsValid(), req.getChecksum());
+                            state = State.ACCEPTING_PASSWORD;
+                            LOG.log(Level.FINE, "Session {0} accepted username {1}.", new Object[]{this, username});
+                            break;
+                        
+                        /*
+                        * Processing password message from the client    
+                        */
+                        case ACCEPTING_PASSWORD:
+                            req = acceptRequest();
+                            LOG.log(Level.FINEST, "Session {0} accepted request message: {1}", new Object[]{this, new String(req.getData())});
+                            String password = parseRequestData(req.getData());
+                            /*
+                            * Authentication
+                            */
+                            try {
+                                int passcode = Integer.parseInt(password);
+                                LOG.log(Level.FINEST, "Session {0} accepted passcode {1}.", new Object[]{this, passcode});
+                                if (user.authenticate(passcode)) {
+                                    state = State.ACCEPTING_MESSAGES;
+                                    LOG.log(Level.INFO, "Session {0} authentication successful.", this);
+                                } else {
+                                    state = State.LOGIN_FAILED;
+                                }                                
+                            } catch (NumberFormatException ex) {
+                                state = State.LOGIN_FAILED;                                
+                            }
+                            break;
+                        
+                        /*
+                        * Processing of INFO and PHOTO messages.
+                        */
+                        case BAD_CHECKSUM:
+                        case ACCEPTING_MESSAGES:
+                            req = acceptRequest();
+                            switch (req.getRequestType()) {
+                                case INFO:
+                                    state = State.ACCEPTING_MESSAGES;
+                                    LOG.log(Level.INFO, "Session {0} accepted info message: {1}", new Object[]{this, new String(req.getData())});
+                                    break;
+                                
+                                case PHOTO:
+                                    if (req instanceof Photo) {
+                                        LOG.log(Level.FINEST, "Session {0} accepted photo message: {1}", new Object[]{this, new String(req.getData())});
+                                        Photo photo = (Photo) req;
+                                        if (photo.validate()) {
+                                            state = State.ACCEPTING_MESSAGES;
+                                        } else {
+                                            state = State.BAD_CHECKSUM;
+                                        }
+                                    } else {
+                                        state = State.SYNTAX_ERROR;
+                                    }
+                                    break;
+                                
+                                /*
+                                * Default point - it is present just for security reasons.
+                                */
+                                default:
+                                    state = State.SYNTAX_ERROR;
+                                
+                            }
+                            break;
+                        
+                        /*
+                        * Errors handling
+                        */
+                        case LOGIN_FAILED:
+                        case SYNTAX_ERROR:                            
+                        case TIMEOUT:
+                            throw new SessionClosedException("Session closed because by the server.");
 
-    private final int size;
-    private final byte[] photo;
-    private final Integer checksum;
-
-    public Photo(Request request, Session session) throws RequestSyntaxException {
-        String[] data = request.getData().split("\\s");
-        size = Integer.parseInt(data[0]);
-        String[] nextData = data[1].split("\\\\x");
-        photo = nextData[0].getBytes();
-        String rawChecksum = "";
-        for (int i = 1; i <= 4; i++) {
-            rawChecksum += nextData[i];
+                        /*
+                        * Safety reasons - if thrown something is terribly wrong
+                        */
+                        default:
+                            throw new IllegalStateException("Illegal state of the state machine.");
+                    }
+                
+                } catch (SyntaxErrorException syntaxErrorException) {     
+                    state = State.SYNTAX_ERROR;                    
+                    LOG.log(Level.WARNING, "Session {0} catched Syntax Error.", this);
+                    
+                } catch (SocketTimeoutException socketTimeoutException){                    
+                    state = State.TIMEOUT;
+                    LOG.log(Level.WARNING, "Session {0} was timeouted.", this);
+                }              
+            
+            }
+        } catch (IOException iOException) {
+            LOG.log(Level.SEVERE, "Session {0} cannot write to socket due to {1}", new Object[] {this, iOException});
+            throw new RuntimeException("Server error. Cannot write to socket.", iOException);        
+            
+        } catch (SessionClosedException sessionClosedException) {
+            try {
+                Thread.sleep(100);
+                socket.close();
+                LOG.log(Level.INFO, "Session {0} closed at port {1}", new Object[]{this, socket.getPort()});
+                
+            } catch (IOException iOException) {
+                LOG.log(Level.SEVERE, "Session {0} cannot close the socket due to {1}", new Object[] {this, iOException});                
+                throw new RuntimeException("Server error. Cannot close the socket.", iOException);        
+                
+            } catch (InterruptedException ex) {
+                Logger.getLogger(Session.class.getName()).log(Level.SEVERE, null, ex);
+            }
+                        
+        } catch (IllegalStateException illegalStateException) {
+            LOG.log(Level.SEVERE, "Illegal state of the Session.run().");
+            throw new RuntimeException("Illegal state of the Session.run()", illegalStateException);
         }
-        checksum = Integer.parseInt(rawChecksum, 16);
     }
-
-    public boolean validateChecksum() {
-        int result = 0;
-        for (byte b : photo) {
-            int i = b;
-            result += i;
+    
+    /**
+     * Parses request data from line request.
+     * @param rawData byte array of data
+     * @return parsed data as string
+     */
+    private String parseRequestData(byte[] rawData){
+        String data = new String(rawData);
+        String[] list = data.split("\r\n");
+        return list.length == 0 ? "" : list[0];
+    }
+    
+    /**
+     * Accepts request from session's input stream.
+     * @return new valid request
+     * @throws SyntaxErrorException if the syntax is incorrect
+     * @throws SessionClosedException if the session is closed by the client
+     * @throws SocketTimeoutException if the timeout expires
+     */
+    protected Request acceptRequest() throws SyntaxErrorException, SessionClosedException, SocketTimeoutException{
+        List<Byte> rawMessage = new ArrayList();
+        final List<Byte> rawKeyword = new ArrayList();
+        final byte[] separator = new byte[2];
+        Request request;
+        Photo photo = null;
+        int photoSeparatorHitCounter = 0;
+        RequestType acceptingType = getRequestType();
+        int checksm = 0;
+        Boolean validationFlag = null;
+        LOG.log(Level.FINE, "Session {0}: Started process of accepting new Request.", this);
+        
+        try {
+            while (true) {
+                int value = in.read();
+                checksm += value;
+                
+                /*
+                * Detection of the client's closure of the session.
+                */
+                if (value < 0) {
+                    throw new SessionClosedException("Socket was closed by the client.");
+                }
+                
+                /*
+                * Loading the message without affecting the keyword
+                */
+                rawMessage.add((byte) value);                                              
+                
+                /*
+                * Loading keyword
+                */
+                if (rawMessage.size() <= 5) {
+                    rawKeyword.add((byte) value);
+                }
+                
+                /*
+                * Reading INFO or PHOTO message
+                */
+                if (acceptingType == RequestType.INFO && rawMessage.size() <= 4) {
+                    String keyword = new String(parseBytes(rawKeyword));
+                    LOG.log(Level.FINE, "Session {0} captured keyword part: {1}", new Object[]{this, keyword});
+                    
+                    /*
+                    * Validation if the extracted keyword is already part of some keywords of known request types
+                    */
+                    if(!(RequestType.INFO.isValidKeywordPart(keyword) || RequestType.PHOTO.isValidKeywordPart(keyword)))
+                        throw new SyntaxErrorException("Invalid syntax.");
+                    
+                    /*
+                    * Resolving the type of the request
+                    */
+                    try {
+                        acceptingType = RequestType.resolveMessageRequestType(keyword);
+                        if(acceptingType == RequestType.PHOTO)
+                            continue;
+                        LOG.log(Level.FINE, "Session {0} changed its accepting type to {1}", new Object[]{this, acceptingType});
+                        
+                    } catch (IllegalArgumentException e) {
+                        if(rawMessage.size() == 4)
+                            throw new SyntaxErrorException("Invalid syntax.", e);
+                        else
+                            LOG.log(Level.SEVERE, "Uncaught exception !!!");
+                    }
+                }
+                
+                /*
+                * Validation of the username keyword
+                */
+                if (acceptingType == RequestType.USERNAME && rawMessage.size() <= 5) {
+                    String keyword = new String(parseBytes(rawKeyword));
+                    if (!RequestType.USERNAME.isValidKeywordPart(keyword)) {
+                        validationFlag = false;
+                    }
+                    if (rawMessage.size() == 5 && keyword.equals(RequestType.USERNAME.keyword())) {
+                        validationFlag = true;
+                    }
+                }
+                
+                /*
+                * Detecting of the end of the line for non-PHOTO requests
+                */
+                if (acceptingType != RequestType.PHOTO) {
+                    separator[1] = (byte) value;
+                    if (Robot.LINE_SEPARATOR.equals(new String(separator))) {
+                        checksm -= 23;
+                        break;
+                    }
+                    separator[0] = separator[1];
+                }
+                
+                /*
+                * Reading the size of PHOTO and validating the syntax of PHOTO message.
+                */
+                if (acceptingType == RequestType.PHOTO && photo == null) {
+                    LOG.log(Level.FINE, "Session {0} actually captured PHOTO message: {1}", new Object[]{this, new String(parseBytes(rawMessage))});
+                    String photoSeparator = new String(new byte[]{(byte) value});
+                    if (photoSeparator.matches("\\s")) {
+                        photoSeparatorHitCounter++;
+                        photo = photoSeparatorHitCounter == 2 ? new Photo(parseBytes(rawMessage)) : null;
+                    } else if(!photoSeparator.matches("\\d") && photoSeparatorHitCounter >= 1){
+                        throw new SyntaxErrorException("Invalid photo syntax.");                        
+                    }
+                    
+                }                
+                
+                /*
+                * Reading the PHOTO message.
+                */
+                if (acceptingType == RequestType.PHOTO && photo != null) {
+                    //byte[] rawPhoto = in.readNBytes(photo.getSize()); -- unused because of JDK 7 or lower being used by Baryk server
+                    int[] rawPhoto = new int[photo.getSize()];   
+                    LOG.log(Level.FINE, "Session {0} PHOTO message size: {1}", new Object[]{this, photo.getSize()});
+                    for(int i = 0; i < photo.getSize(); i++){
+                        rawPhoto[i] = in.read();
+                    }
+                    /*
+                    * Counting the checksum of the photo
+                    */
+                    int checksum = 0;
+                    for (int b : rawPhoto) {
+                        checksum += b;
+                        rawMessage.add((byte) b);
+                    }
+                    LOG.log(Level.FINE, "Session {0} PHOTO message counted checksum: {1}", new Object[]{this, checksum});
+                    photo.setCountedChecksum(checksum);
+                    
+                    //byte[] rawChecksum = in.readNBytes(4); -- unused because of JDK 7 or lower being used by Baryk server
+                    /*
+                    * Extracting the right checksum for the validation
+                    */
+                    byte[] rawChecksum = new byte[4];
+                    for(int i = 0; i < 4; i++){
+                        int b = in.read();
+                        rawChecksum[i] = (byte) b;
+                        rawMessage.add((byte) b);
+                    }
+                    
+                    StringBuilder sb = new StringBuilder();
+                    for (byte b : rawChecksum) {
+                        sb.append(String.format("%02x", b));
+                    }                    
+                    int expectedChecksum = Integer.parseInt(sb.toString(), 16);
+                    LOG.log(Level.FINE, "Session {0} PHOTO message expected checksum: {1}", new Object[]{this, expectedChecksum});
+                    photo.setExpectedChecksum(expectedChecksum);                    
+                    return photo;
+                }
+            }
+            request = new Request(acceptingType);
+            request.setChecksum(checksm);
+            request.setIsValid(validationFlag);
+            LOG.log(Level.FINE, "Session {0} checksum of message {1} is: {2}", new Object[]{this, acceptingType, checksm});
+            request.setData(parseBytes(rawMessage));
+            if(!request.checkSyntax())
+                throw new SyntaxErrorException("Invalid syntax of request " + request);
+            else
+                return request;
+        } catch (SocketTimeoutException socketTimeoutException){
+            throw socketTimeoutException;
+            
+        } catch (IOException iOException) {
+            throw new SessionClosedException("Error while reading input stream of the session.", iOException);
+        
+        } catch (NumberFormatException numberFormatException) {
+            throw new SyntaxErrorException("Wrong number format of photo valid checksum.", numberFormatException);
         }
-        return checksum.equals(result);
+    }
+    /**
+     * Converts {@code List<Byte>} to {@code byte[]}
+     * 
+     * <p><i>Used due to old version of JDK being run at the Baryk server</i>
+     * @param list of bytes
+     * @return primitives from the list collection given
+     */
+    private byte[] parseBytes(List<Byte> bytes){
+        Byte[] rawBytes = bytes.toArray(new Byte[bytes.size()]);
+        byte[] returnBytes = new byte[rawBytes.length];
+        for(int i = 0; i < rawBytes.length; i++){
+            returnBytes[i] = (byte) rawBytes[i];
+        }
+        return returnBytes;
+    }
+    
+    /**
+     * Gets the request type for actual state of the session.
+     * @return request type for actual state
+     */
+    protected RequestType getRequestType(){
+        Objects.requireNonNull(state);
+        switch(state){
+            case ACCEPTING_USERNAME:
+                return RequestType.USERNAME;
+            
+            case ACCEPTING_PASSWORD:
+                return RequestType.PASSWORD;
+            
+            case ACCEPTING_MESSAGES:
+            case BAD_CHECKSUM:
+                return RequestType.INFO;
+            
+            default:
+                throw new IllegalStateException("No request type for this state " + state);
+        }
+    }
+    
+}
+
+/**
+ * Represents the state of the {@link Session}
+ * @author Matej Barton (bartom47@fel.cvut.cz)
+ */
+enum State{
+    ACCEPTING_USERNAME(200, "login", false),
+    ACCEPTING_PASSWORD(201, "password", false),
+    ACCEPTING_MESSAGES(202, "ok", false),   
+    BAD_CHECKSUM(300, "bad checksum", false),
+    LOGIN_FAILED(500, "login failed", true),
+    SYNTAX_ERROR(501, "syntax error", true),
+    TIMEOUT(502, "timeout", true);
+    
+    private final int code;
+    private final String message;
+    private final boolean finalState;
+
+    private State(int code, String message, boolean finalState) {
+        this.code = code;
+        this.message = message;
+        this.finalState = finalState;
     }
 
-    public int getSize() {
-        return size;
+    public int getCode() {
+        return code;
     }
 
-    public byte[] getPhoto() {
-        return photo;
+    /**
+     * Returns the message according to the protocol specified
+     * @return string message for each state
+     */
+    public String getMessage() {
+        return String.format("%s %s%s", code, message.toUpperCase(), Robot.LINE_SEPARATOR);
     }
 
-    public Integer getChecksum() {
+    /**
+     * Flag if the state is final
+     * @return the final state
+     * @deprecated Actually not used but left there
+     */
+    @Deprecated
+    public boolean isFinalState() {
+        return finalState;
+    }        
+}
+
+/**
+ * Represents the type of each {@link Request}
+ * @author Matej Barton (bartom47@fel.cvut.cz)
+ */
+enum RequestType{
+    USERNAME("Robot"),
+    PASSWORD,
+    INFO("INFO", "^INFO .+"), 
+    PHOTO("FOTO", "^FOTO \\d+ ");
+    
+    private final String keyword;
+    private final int byteLength;
+    private final Pattern syntax;
+    
+    private RequestType(){
+        this("", ".*");
+    }
+    
+    private RequestType(String keyword){
+        this(keyword, ".*");
+    }
+    
+    private RequestType(String keyword, String syntax){
+        this(keyword, syntax, -1);        
+    }
+    
+    private RequestType(String keyword, String syntax, int byteLength){
+        this.keyword = keyword;
+        this.syntax = Pattern.compile(syntax, Pattern.DOTALL);
+        this.byteLength = byteLength;
+    }
+    
+    /**
+     * Resolves the request type
+     * @param keyword keyword of the request type
+     * @return RequestType enum value with the keyword given
+     * @throws IllegalArgumentException when no such keyword is found
+     */
+    public static RequestType resolveMessageRequestType(String keyword) throws IllegalArgumentException{
+        if(keyword.equals(INFO.keyword)){
+            return INFO;
+        } else if (keyword.equals(PHOTO.keyword)){
+            return PHOTO;
+        } else {
+            throw new IllegalArgumentException("No keyword found");
+        }
+    }
+    
+    /**
+     * Returns the syntax.
+     * @return syntax of the request
+     */
+    public Pattern getSyntax(){
+        return syntax;
+    }
+    
+    /**
+     * Returns the keyword
+     * @return the keyword
+     */
+    public String keyword(){
+        return keyword;
+    }
+    
+    /**
+     * Checks if the keyword part given is already part of the keyword 
+     * of the specified enum value.
+     * 
+     * @param keywordPart part of the keyword
+     * @return {@code true} if the keyword part is substring of the keyword,
+     * {@code false} otherwise
+     */
+    public boolean isValidKeywordPart(String keywordPart){
+        if(keywordPart.length() > 4 || keywordPart.length() <= 0)
+            return false;
+        else{
+            Pattern pat = Pattern.compile(keyword.substring(0, keywordPart.length()));
+            return pat.matcher(keywordPart).matches();            
+        }
+
+    }
+}
+
+/**
+ * Represents the request of from the client.
+ * 
+ * @author Matej Barton (bartom47@fel.cvut.cz)
+ */
+class Request{
+    private byte[] data;
+    private int checksum;
+    private Boolean isValid;
+    private final RequestType requestType;    
+
+    /**
+     * Creates new request with specified request type.
+     * @param requestType type of the request
+     */
+    public Request(RequestType requestType) {        
+        Objects.requireNonNull(requestType);        
+        this.requestType = requestType;        
+    }
+
+    /**
+     * Returns data associated with the request
+     * @return data if the data is present or {@code null} otherwise
+     */
+    public byte[] getData() {
+        return data;
+    }
+
+    /**
+     * Returns the stored checksum value
+     * @return stored checksum value
+     */
+    public int getChecksum() {
         return checksum;
     }
 
-    void flush() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class Request {
-
-    private final RequestType type;
-    private final String data;
-
-    public Request(String rawRequest) throws RequestSyntaxException {
-        this.type = resolveType(rawRequest);
-        this.data = resolveData(this.type, rawRequest);
-    }
-
-    private RequestType resolveType(String rawRequest) throws RequestSyntaxException {
-        RequestType result = null;
-        for (RequestType reqType : RequestType.values()) {
-            if (reqType.checkSyntax(rawRequest)) {
-                result = reqType;
-                break;
-            }
-        }
-        if (result == null) {
-            throw new RequestSyntaxException("Wrong input format for raw request " + rawRequest);
-        } else {
-            return result;
-        }
-    }
-
-    private String resolveData(RequestType type, String rawRequest) {
-        switch (type) {
-            case INFO:
-            case PHOTO:
-                String[] parsedRequest = rawRequest.split("^[A-Z]+\\s");
-                return parsedRequest.length > 1 ? parsedRequest[1] : "";
-            case USERNAME:
-            case PASSWORD:
-                return rawRequest;
-            default:
-                throw new InputMismatchException("Uknown type for " + type);
-        }
-    }
-
-    public RequestType getType() {
-        return type;
-    }
-
-    public String getData() {
-        return data;
-    }
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-enum RequestType {
-
-    USERNAME("(^Robot)(\\s*\\w+)"),
-    PASSWORD("(^\\d+$)"),
-    INFO("(^INFO)\\s([^\\r\\n])*"),
-    PHOTO("^FOTO\\s\\d+\\s[^\\s]+$");
-
-    private final Pattern syntax;
-
-    private RequestType(String syntax) {
-        this.syntax = Pattern.compile(syntax);
-
-    }
-
-    public boolean checkSyntax(String message) {
-        Matcher m = syntax.matcher(message);
-        return m.find();
-    }
-    
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class Session extends Thread implements Serializable{
-    private static final Logger LOG = Logger.getLogger(Session.class.getName());    
-    
-    private Server srv;    
-    private Socket socket; 
-    private InputStream in;
-    private OutputStream out;    
-    protected Date established;
-    private final String name;
-    private boolean isRunning;
-    
-    private Scanner sc;
-    
-    private final List<Photo> photos = new ArrayList();   
-    
-    private User user;
-       
-    
     /**
-     * Initializes new session with specified socket and reference to server where the session is run.
-     * @param socket socket extracted from {@link Server.srvSocket}
-     * @param server reference to server
-     * @throws IOException if the session is not able to read/write to socket
+     * Sets the given checksum value to be stored with the request.
+     * @param checksum the checksum of the request data
      */
-    public Session(Socket socket, Server server) throws IOException{
-        super();                
-        established = new Date();
-        this.socket = socket;
-        in = socket.getInputStream();
-        out = socket.getOutputStream();
-        name = generateName();        
-        srv = server;
-        sc = new Scanner(in).useDelimiter("\\r\\n");       
+    public void setChecksum(int checksum) {
+        this.checksum = checksum;
     }
-    
+
     /**
-     * Represents the session runtime
+     * Returns the valid flag of the request.
+     * @return {@code true} if the request has valid flag, 
+     * {@code false} if not, {@code null} if the flag is not used
      */
-    @Override
-    public void run(){                    
-        LOG.log(Level.INFO, "Connected session {0} to socket: {1}", new Object[]{this, socket.getPort()});
-        LOG.log(Level.FINE, "Session {0} established: {1}", new Object[]{this, established});
-        isRunning = true;
-        try{
-            socket.setSoTimeout(Server.SESSION_TIMEOUT_SECONDS * 1000);
-            Response response = new AcceptingUsername(this);
-            sendResponse(response);            
-            while((response = response.next()) != null && socket.isConnected() && isRunning){         
-                LOG.log(Level.FINEST, "Session {0} response: {1}", new Object[]{this, response});
-                LOG.log(Level.FINEST, "Session {0} socket is connected {1}", new Object[]{this, socket.isConnected()});
-            }
-            in.read();
-            close();
-        } catch (SessionRunException ex){
-            ex.printStackTrace(); 
+    public Boolean getIsValid() {
+        return isValid;
+    }
+
+    /**
+     * Sets the valid flag of the request.
+     * @param isValid boolean value, {@code true} if the request is valid,
+     * {@code false} if not, {@code null} if the flag is not used
+     */
+    public void setIsValid(Boolean isValid) {
+        this.isValid = isValid;
+    }
+                
+    /**
+     * Sets the request data
+     * @param data data of the request
+     */
+    public void setData(byte[] data) {
+        this.data = data;
+    }
+
+    /**
+     * Returns the request type of the request.
+     * @return the request type of the request
+     */
+    public RequestType getRequestType() {
+        return requestType;
+    }
             
-        } catch (IOException ex) {
-            if(ex instanceof SocketTimeoutException){
-                try {
-                    Response response = new Timeout(this);
-                    response.next();
-                    close();
-                } catch (SessionRunException ex1) {
-                    ex.printStackTrace();
-                }
-            } else {
-                LOG.log(Level.SEVERE, "Unknown error catched. {0}", ex);
-                ex.printStackTrace();
-            }
-        }
+    /**
+     * Checks syntax associated with the request type.
+     * @return {@code true} if the syntax is correct,
+     * {@code false} otherwise
+     */
+    public boolean checkSyntax(){
+        Objects.requireNonNull(data);
+        final String message = new String(data);
+        final Matcher m = requestType.getSyntax().matcher(message);
+        return m.matches();
+    }
+             
+}
+
+/**
+ * Represents the user, who is logging in the system.
+ * 
+ * @author Matej Barton (bartom47@fel.cvut.cz)
+ */
+class User{
+    private final boolean isValidUsername;
+    private final int passcode;
+          
+    /**
+     * Creates new user.
+     * 
+     * @param isValidUsername flag if valid username was captured by previous request
+     * @param passcode passcode for the user computed
+     */
+    public User(Boolean isValidUsername, int passcode){
+        Objects.requireNonNull(isValidUsername);
+        this.isValidUsername = isValidUsername;
+        this.passcode = passcode;
     }
     
     /**
-     * Closes the session
-     * @throws cz.cvut.fel.psi.tcpserver.exceptions.SessionRunException
+     * Authenticates the user for passcode given.
+     * 
+     * @param passcode passcode sent by the client
+     * @return {@code true} if the passcode matches the passcode stored
+     * and the username is valid or {@code false} otherwise
      */
-    public synchronized void close() throws SessionRunException{
-        try{
-            if(isRunning){
-                LOG.log(Level.INFO, "Session {0}: Closing session.", this);
-                isRunning = false;
-                in.close();
-                out.close();
-                socket.close();
-            }
-        }   catch (IOException ex) {
-            LOG.log(Level.SEVERE, "Cannot close Session {0}", this);
-            throw new SessionRunException("Cannot close session " + this, ex);
-        }
-    }
-    
-    /**
-     * Sends response to client
-     * @param response response to be sent. 
-     * @throws SessionRunException when the process fails
-     */
-    public void sendResponse(Response response) throws SessionRunException{        
-        try {
-            out.write(response.toString().getBytes());
-            LOG.log(Level.FINEST, "Sesion {0} response message sent: {1}", new Object[]{this, response});
-        } catch (IOException ex) {
-            throw new SessionRunException("Cannot send response.", ex);
-        }
-    }
-    
-    /**
-     * Scans the input stream until there is a request to capture.
-     * @return new request captured from Socket.inputStream     
-     * @throws NoSuchElementException if there is no element
-     * @throws RequestSyntaxException if the syntax does not match
-     */
-    public Request acceptRequest() throws NoSuchElementException, RequestSyntaxException{        
-        String message = sc.next();
-        LOG.log(Level.FINEST, "Session {0}: Read raw message {1}", new Object[]{this, message});
-        return new Request(message);        
-    }
-
-    /**
-     * <i>Method for testing.</i> Returns the input stream of the session.
-     * @return input stream of the session
-     */
-    protected InputStream getIn() {
-        return in;
-    }
-
-    /**
-     * <i>Method for testing.</i> Sets the input stream of the session.
-     * @param in input stream to mock the session.
-     */
-    protected void setIn(InputStream in) {
-        this.in = in;
-    }
-
-    /**
-     * <i>Method for testing.</i> Returns the output stream of the session.
-     * @return output stream of the session
-     */
-    protected OutputStream getOut() {
-        return out;
-    }
-
-    /**
-     * <i>Method for testing.</i> Sets the output stream of the session.
-     * @param out output stream to mock the session.
-     */
-    protected void setOut(OutputStream out) {
-        this.out = out;
-    }
-    
-    /**
-     * Returns hashed session name from established date and socket local port number.
-     * @return session name
-     */
-    @Override
-    public String toString() {
-        return name;        
-    }
-    
-    /**
-     * Generates session name as a MD5 hash of Session.established, Session.socket.localPort
-     * @return hashed String
-     */
-    private String generateName(){
-        try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            Random randomizer = new Random();
-            md.update(("Session " + socket.getLocalPort() + " " + established + randomizer.nextInt()).getBytes());
-            byte[] digest = md.digest();
-            //return Base64.getEncoder().encodeToString(digest).toUpperCase();
-            return new String(digest).toUpperCase();
-        } catch (NoSuchAlgorithmException ex) {
-            LOG.log(Level.SEVERE, "Something is terribly wrong!!!", ex);
-            throw new RuntimeException("Session.generateName() failed. " + ex);
-        }
-    }
-
-    /**
-     * Returns hashCode of Session.name
-     * @return hashCode of Session.name
-     */
-    @Override
-    public int hashCode() {
-        return name.hashCode();
-    }
+    public boolean authenticate(int passcode){        
+        Objects.requireNonNull(passcode);
+        boolean validUsername;
+        boolean validPassword;
         
+        validPassword = passcode == this.passcode;
+        
+        return isValidUsername && validPassword;                
+    }        
+}
+
+/**
+ * Represents the photo stored at the server.
+ * 
+ * @author Matej Barton (bartom47@fel.cvut.cz)
+ */
+final class Photo extends Request{
+    private int expectedChecksum;
+    private int countedChecksum;
+    private final int size;
+    
     /**
-     * Gets logged in user of the session
-     * @return user object or null if not initialised yet
+     * Creates new photo from the request data. Validates the request data.
+     * @param data data from the request
+     * @throws SyntaxErrorException if the size extracted from the request could
+     * not be load or the size is equal or before zero
      */
-    public User getUser() {
-        return user;
+    public Photo(byte[] data) throws SyntaxErrorException{
+        super(RequestType.PHOTO);
+        setData(data);
+        if(checkSyntax()){
+            String message = new String(data);
+            String rawSize = message.split(" ")[1];
+            size = Integer.parseInt(rawSize);
+            if(size <= 0)
+                throw new SyntaxErrorException("Invalid size of photo.");
+        } else
+            throw new SyntaxErrorException("Invalid syntax of photo request.");        
     }
 
     /**
-     * Sets user to the session
-     * @param user to be set
+     * Returns the expected checksum of the photo
+     * @return expected checksum
      */
-    public void setUser(User user) {
-        this.user = user;
+    public int getExpectedChecksum() {
+        return expectedChecksum;
+    }
+
+    /**
+     * Sets the expected checksum to be stored
+     * @param expectedChecksum expected checksum of the photo
+     */
+    public void setExpectedChecksum(int expectedChecksum) {
+        this.expectedChecksum = expectedChecksum;
+    }
+
+    /**
+     * Gets the counted checksum of the photo
+     * @return counted checksum
+     */
+    public int getCountedChecksum() {
+        return countedChecksum;
+    }
+
+    /**
+     * Sets the counted checksum to be stored.
+     * @param countedChecksum counted checksum of the photo
+     */
+    public void setCountedChecksum(int countedChecksum) {
+        this.countedChecksum = countedChecksum;
     }
     
     /**
-     * Adds photo to session save queue. The save of photo is currenty temporary.
-     * @param photo retrieved from request
-     * @throws BadChecksumException when the photo is not complete
+     * Validates the checksums.
+     * @return {@code true} if expected checksum is equal to counted checksum or
+     * {@code false} otherwise
      */
-    public void addPhoto(Photo photo) throws BadChecksumException{
-        if(photo.validateChecksum()){
-            LOG.log(Level.INFO, "Session {0}: Photo {1} uploaded.", new Object[]{this, photo});
-            //photos.add(photo);
-        } else {
-            throw new BadChecksumException("Incomplete transfer for photo " + photo);
-        }
-    }
-    
-    /**
-     * Return number of photos uploaded by this session.
-     * @return number of photos in the buffer
-     */
-    public int getPhotoCounter(){
-        return photos.size();
-    }
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class User implements Serializable {
-
-    private final String username;
-
-    public User(String username) {
-        this.username = username;
-    }
-
-    public User(Request request) {
-        if (request.getType() == RequestType.USERNAME) {
-            this.username = request.getData();
-        } else {
-            //throw new IllegalStateException();
-            this.username = "";
-        }
-    }
-
-    public String getPassword() {
-        byte[] bytes = username.getBytes();
-        int sum = 0;
-        for (byte b : bytes) {
-            sum += b;
-        }
-        return Integer.toString(sum);
-    }
-
-    @Override
-    public String toString() {
-        return username;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj.hashCode() == username.hashCode();
-    }
-
-    @Override
-    public int hashCode() {
-        return username.hashCode();
-    }
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class AcceptingMessages extends Response {
-
-    public AcceptingMessages(Session session) {
-        this(session, 202, "ok");
-
-    }
-
-    public AcceptingMessages(Session session, int code, String message) {
-        super(session, code, message);
-        acceptableRequests.add(RequestType.INFO);
-        acceptableRequests.add(RequestType.PHOTO);
-    }
-
-    @Override
-    public Response next() {
-        try {
-            try {
-                Request req = session.acceptRequest();
-                if (acceptableRequests.contains(req.getType())) {
-                    processRequest(req);
-                    Response next = new AcceptingMessages(session);
-                    session.sendResponse(next);
-                    return next;
-                } else {
-                    return new RequestSyntaxError(session);
-                }
-            } catch (NoSuchElementException ex) {
-                return null;
-
-            } catch (RequestSyntaxException ex) {
-                return new RequestSyntaxError(session);
-
-            } catch (BadChecksumException ex) {
-                Response next = new BadChecksum(session);
-                session.sendResponse(next);
-                return next;
-            }
-        } catch (SessionRunException ex) {
-            ex.printStackTrace();
-            return null;
-        }
-    }
-
-    private void processRequest(Request req) throws BadChecksumException, RequestSyntaxException {
-        switch (req.getType()) {
-            case INFO:
-                break;
-
-            case PHOTO:
-                session.addPhoto(new Photo(req, session));
-                break;
-
-            default:
-                throw new IllegalStateException("Request type must be only of RequestType.INFO or RequestType.PHOTO.");
-        }
-    }
-
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class AcceptingPassword extends Response {
-
-    private boolean invalidUsername;
-
-    public AcceptingPassword(Session session) {
-        this(session, false);
-    }
-
-    public AcceptingPassword(Session session, boolean invalidUsername) {
-        super(session, 201, "password");
-        this.invalidUsername = invalidUsername;
-    }
-
-    private boolean validateUser(Request req) {
-        if (invalidUsername) {
-            return false;
-        } else {
-            return session.getUser().getPassword().equals(req.getData());
-        }
-    }
-
-    @Override
-    public Response next() {
-        try {
-            Request req = session.acceptRequest();
-            if (validateUser(req)) {
-                Response next = new AcceptingMessages(session);
-                session.sendResponse(next);
-                return next;
-            } else {
-                return new Unauthorized(session);
-            }
-        } catch (NoSuchElementException ex) {
-            return null;
-
-        } catch (RequestSyntaxException ex) {
-            return new Unauthorized(session);
-
-        } catch (SessionRunException ex) {
-            ex.printStackTrace();
-            return null;
-        }
-    }
-
-    public boolean isInvalidUsername() {
-        return invalidUsername;
-    }
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class AcceptingUsername extends Response {
-
-    public AcceptingUsername(Session session) {
-        super(session, 200, "login");
-    }
-
-    @Override
-    public Response next() {
-        try {
-            try {
-                Request req = session.acceptRequest();
-                session.setUser(new User(req));
-                Response next = new AcceptingPassword(session);
-                session.sendResponse(next);
-                return next;
-
-            } catch (NoSuchElementException ex) {
-                return null;
-
-            } catch (RequestSyntaxException ex) {
-                Response next = new AcceptingPassword(session);
-                session.sendResponse(next);
-                return new AcceptingPassword(session, true);
-            }
-        } catch (SessionRunException ex) {
-            ex.printStackTrace();
-            return null;
-        }
-    }
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class BadChecksum extends AcceptingMessages {
-
-    public BadChecksum(Session session) {
-        super(session, 300, "bad checksum");
-    }
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class RequestSyntaxError extends Response {
-
-    public RequestSyntaxError(Session session) {
-        super(session, 501, "syntax error");
-    }
-
-    @Override
-    public Response next() {
-        try {
-            session.sendResponse(this);
-            return null;
-        } catch (SessionRunException ex) {
-            ex.printStackTrace();
-            return null;
-        }
-    }
-
-}
-
-/**
- * Response from the state machine
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-abstract class Response {
-
-    protected final List<RequestType> acceptableRequests = new ArrayList();
-
-    protected int code;
-    protected String message;
-    protected Session session;
-
-    protected Response(Session session, int code, String message) {
-        this.code = code;
-        this.message = message;
-        this.session = session;
+    public boolean validate(){
+        return countedChecksum == expectedChecksum;
     }
 
     /**
-     * Generates the message in valid syntax for client
-     *
-     * @return message for client
+     * Gets the size of the photo.
+     * @return size of the photo
      */
-    @Override
-    public String toString() {
-        return code + " " + message.toUpperCase() + "\r\n";
-    }
-
-    /**
-     * Gets next step in valid sequence
-     *
-     * @return next state or null if the state is final
-     */
-    public abstract Response next();
-
+    public int getSize() {
+        return size;
+    }        
 }
 
 /**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
+ * Signal for the session runtime to close the session.
+ * 
+ * @author Matej Barton (bartom47@fel.cvut.cz)
  */
-class Timeout extends Response {
+class SessionClosedException extends Exception{
 
-    public Timeout(Session session) {
-        super(session, 502, "timeout");
-    }
-
-    @Override
-    public Response next() {
-        try {
-            session.sendResponse(this);
-            return null;
-        } catch (SessionRunException ex) {
-            ex.printStackTrace();
-            return null;
-        }
-    }
-
-}
-
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class Unauthorized extends Response {
-
-    public Unauthorized(Session session) {
-        super(session, 500, "login failed");
-    }
-
-    @Override
-    public Response next() {
-        try {
-            session.sendResponse(this);
-            return null;
-        } catch (SessionRunException ex) {
-            ex.printStackTrace();
-            return null;
-        }
-    }
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class BadChecksumException extends Exception {
-
-    /**
-     * Creates a new instance of <code>BadChecksumException</code> without
-     * detail message.
-     */
-    public BadChecksumException() {
-    }
-
-    /**
-     * Constructs an instance of <code>BadChecksumException</code> with the
-     * specified detail message.
-     *
-     * @param msg the detail message.
-     */
-    public BadChecksumException(String msg) {
-        super(msg);
-    }
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class RequestSyntaxException extends Exception {
-
-    public RequestSyntaxException(String message) {
+    public SessionClosedException(String message) {
         super(message);
     }
-}
 
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class ServerRunException extends Exception {
-
-    /**
-     * Creates a new instance of <code>ServerRunException</code> without detail
-     * message.
-     */
-    public ServerRunException() {
-    }
-
-    /**
-     * Constructs an instance of <code>ServerRunException</code> with the
-     * specified detail message.
-     *
-     * @param msg the detail message.
-     */
-    public ServerRunException(String msg) {
-        super(msg);
-    }
-
-    public ServerRunException(String message, Throwable cause) {
+    public SessionClosedException(String message, Throwable cause) {
         super(message, cause);
     }
-
+    
 }
 
 /**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
+ * This exception is thrown when {@code SYNTAX_ERROR} response
+ * is expected.
+ * 
+ * @author Matej Barton (bartom47@fel.cvut.cz)
  */
-class SessionRunException extends Exception {
+class SyntaxErrorException extends Exception{
 
-    public SessionRunException(String message, Throwable cause) {
+    public SyntaxErrorException(String message) {
+        super(message);
+    }
+
+    public SyntaxErrorException(String message, Throwable cause) {
         super(message, cause);
     }
-
-}
-
-/**
- *
- * @author Matej Barton (bartom47@fel.cvut.cz}
- */
-class UnauthenticatedException extends Exception {
-
-    /**
-     * Creates a new instance of <code>UnauthenticatedException</code> without
-     * detail message.
-     */
-    public UnauthenticatedException() {
-    }
-
-    /**
-     * Constructs an instance of <code>UnauthenticatedException</code> with the
-     * specified detail message.
-     *
-     * @param msg the detail message.
-     */
-    public UnauthenticatedException(String msg) {
-        super(msg);
-    }
+    
 }
