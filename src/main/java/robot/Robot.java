@@ -58,9 +58,9 @@ public class Robot {
        
         // Logger settings
         Logger rootLogger = LogManager.getLogManager().getLogger("");
-        rootLogger.setLevel(Level.FINE);
+        rootLogger.setLevel(Level.INFO);
         for (Handler h : rootLogger.getHandlers()) {
-            h.setLevel(Level.FINE);
+            h.setLevel(Level.INFO);
         }
         
         int serverPort;
