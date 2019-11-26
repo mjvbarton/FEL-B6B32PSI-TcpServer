@@ -392,8 +392,8 @@ enum State{
 enum RequestType{
     USERNAME,
     PASSWORD,
-    INFO("INFO", "^INFO\\s.*"), 
-    PHOTO("FOTO", "^FOTO\\s\\d+\\s");
+    INFO("INFO", "^INFO .+"), 
+    PHOTO("FOTO", "^FOTO \\d+ ");
     
     private final String keyword;
     private final int byteLength;
@@ -525,7 +525,7 @@ final class Photo extends Request{
         if(checkSyntax()){
             String message = new String(data);
             String rawSize = message.split("\\s")[1];
-            size = Integer.parseInt(rawSize);            
+            size = Integer.parseInt(rawSize);
         } else
             throw new SyntaxErrorException("Invalid syntax of photo request.");        
     }
